@@ -14,19 +14,24 @@ import org.objectweb.asm.Opcodes;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.function.Consumer;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class CsClassWritter extends ClassVisitor {
-    private final Writer code;
+    private final Writer out;
     private final boolean pretty;
+    private final Consumer<String> dependencyCallback;
     private String classsName;
     private int indentation;
 
-    public CsClassWritter(Writer out, boolean pretty) {
+    public CsClassWritter(Writer out,
+                          boolean pretty,
+                          Consumer<String> dependencyCallback) {
         super(Opcodes.ASM5);
-        code = checkNotNull(out);
+        this.out = checkNotNull(out);
         this.pretty = pretty;
+        this.dependencyCallback = checkNotNull(dependencyCallback);
     }
 
     @Override
@@ -35,7 +40,7 @@ public class CsClassWritter extends ClassVisitor {
         String packageName = name.substring(0, pos).replaceAll("/", ".");
         classsName = name.substring(pos + 1);
 
-        line("namespace %s {", packageToNamespace(packageName));
+        line("namespace %s {", capitalize(packageName));
         indentation++;
         line("%sclass %s {", modifiers(access), classsName);
         indentation++;
@@ -43,10 +48,15 @@ public class CsClassWritter extends ClassVisitor {
 
     @Override
     public void visitEnd() {
-        indentation--;
-        line("}");
-        indentation--;
-        line("}");
+        try {
+            indentation--;
+            line("}");
+            indentation--;
+            line("}");
+            out.flush();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -64,17 +74,18 @@ public class CsClassWritter extends ClassVisitor {
         int argCount = Iterables.size(new DescIterable(desc.substring(1, argEnd)));
 
         startLine();
-        write("%s%s %s(",
+        boolean isConstructor = name.equals("<init>");
+        write("%s%s%s(",
                 modifiers(access),
-                signatureTotype(desc.substring(argEnd + 1)),
-                name.equals("<init>") ? classsName : name);
+                isConstructor ? "" : signatureTotype(desc.substring(argEnd + 1)) + " ",
+                isConstructor ? classsName : capitalize(name));
         return new CsMethodVisitor(argCount);
     }
 
     private void startLine() {
         try {
             if (pretty) {
-                code.append(Strings.repeat("\t", indentation));
+                out.append(Strings.repeat("\t", indentation));
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -83,7 +94,7 @@ public class CsClassWritter extends ClassVisitor {
 
     private void write(String format, Object... args) {
         try {
-            code.append(String.format(format, args));
+            out.append(String.format(format, args));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -92,7 +103,7 @@ public class CsClassWritter extends ClassVisitor {
     private void endLine() {
         try {
             if (pretty) {
-                code.append("\r\n");
+                out.append("\r\n");
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -105,7 +116,7 @@ public class CsClassWritter extends ClassVisitor {
         endLine();
     }
 
-    private static String packageToNamespace(String packageName) {
+    private static String capitalize(String packageName) {
         return Joiner.on('.')
                 .join(Iterables.transform(Splitter.on('.')
                         .split(packageName), CaseFormat.LOWER_CAMEL.converterTo(CaseFormat.UPPER_CAMEL)));
@@ -118,24 +129,39 @@ public class CsClassWritter extends ClassVisitor {
                 (accessFlags & Opcodes.ACC_FINAL) != 0 ? "readonly " : "");
     }
 
-    private static String signatureTotype(String signature) {
+    private String signatureTotype(String signature) {
         if (signature.startsWith("[")) {
             return signatureTotype(signature.substring(1)) + "[]";
         } else {
             switch (signature) {
                 case "V":
-                    return "";
-                case "":
                     return "void";
-                case "I":
-                    return "int";
                 case "Z":
                     return "boolean";
+                case "C":
+                    return "char";
+                case "B":
+                    return "byte";
+                case "S":
+                    return "short";
+                case "I":
+                    return "int";
+                case "F":
+                    return "float";
+                case "J":
+                    return "long";
+                case "D":
+                    return "double";
+                case "Ljava/lang/Object;":
+                    return "object";
                 case "Ljava/lang/String;":
                     return "string";
                 default:
-                    return packageToNamespace(signature.substring(1,
-                            signature.length() - 1).replaceAll("/", "."));
+                    String referencedClass = signature.substring(1,
+                            signature.length() - 1);
+                    dependencyCallback.accept(referencedClass);
+                    return capitalize(referencedClass
+                            .replaceAll("/", "."));
             }
         }
     }
@@ -147,6 +173,7 @@ public class CsClassWritter extends ClassVisitor {
         public CsMethodVisitor(int argCount) {
             super(Opcodes.ASM5);
             this.argCount = argCount;
+            writeParamsEnd();
         }
 
         public void visitLocalVariable(String name,
@@ -162,12 +189,7 @@ public class CsClassWritter extends ClassVisitor {
                             signatureTotype(desc),
                             name,
                             argCount > 0 ? ", " : "");
-                    if (argCount == 0) {
-                        write(")");
-                        endLine();
-                        line("{");
-                        indentation++;
-                    }
+                    writeParamsEnd();
                 } else {
                     line("%s %s;",
                             signatureTotype(desc),
@@ -180,6 +202,15 @@ public class CsClassWritter extends ClassVisitor {
         public void visitEnd() {
             indentation--;
             line("}");
+        }
+
+        private void writeParamsEnd() {
+            if (argCount == 0) {
+                write(")");
+                endLine();
+                line("{");
+                indentation++;
+            }
         }
     }
 }
