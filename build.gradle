@@ -37,6 +37,6 @@ publishing {
 
 dependencies {
 	testCompile "junit:junit:4.12"
-	compile 'org.apache.bcel:bcel:6.0'
+    compile 'org.ow2.asm:asm:5.2'
     compile 'com.google.guava:guava:21.0'
 }
