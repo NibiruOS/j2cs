@@ -1,0 +1,42 @@
+apply plugin: 'eclipse'
+apply plugin: 'java'
+apply plugin: 'maven'
+apply plugin: 'maven-publish'
+
+version = '0.1-SNAPSHOT'
+group = 'com.aajtech.nibiru.j2cs'
+
+repositories {
+    mavenCentral()
+    jcenter()
+    maven {
+        url "https://oss.sonatype.org/content/repositories/snapshots/"
+    }
+    maven {
+        url "https://oss.sonatype.org/content/repositories/google-snapshots/"
+    }
+	mavenLocal()
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+    	maven {
+			credentials {
+				username = sonatypeUser
+				password = sonatypePassword
+			}
+            url "https://oss.sonatype.org/content/repositories/snapshots"
+	    }
+	}
+}
+
+dependencies {
+	testCompile "junit:junit:4.12"
+	compile 'org.apache.bcel:bcel:6.0'
+    compile 'com.google.guava:guava:21.0'
+}
