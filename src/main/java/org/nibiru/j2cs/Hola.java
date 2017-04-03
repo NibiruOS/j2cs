@@ -7,7 +7,12 @@ public class Hola {
     public int kkck = 123;
     boolean zxing;
     Preconditions p;
-    public Hola(Preconditions[] p, boolean x) {
+
+    public void simple() {
+        System.out.println("hola");
+    }
+/*
+    public Hola(Preconditions p, boolean x) {
         super();
     }
 
@@ -19,4 +24,5 @@ public class Hola {
             return "Hola";
         }
     }
+    */
 }

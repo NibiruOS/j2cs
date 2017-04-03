@@ -5,15 +5,21 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 
+import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.FieldVisitor;
+import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.TypePath;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.Deque;
+import java.util.List;
 import java.util.function.Consumer;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -63,21 +69,20 @@ public class CsClassWritter extends ClassVisitor {
     public FieldVisitor visitField(int access, String name, String desc, String signature, Object value) {
         line("%s%s %s;",
                 modifiers(access),
-                signatureTotype(desc),
+                signatureToType(desc),
                 name);
         return null;
     }
 
     @Override
     public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
-        int argEnd = desc.indexOf(')');
-        int argCount = Iterables.size(new DescIterable(desc.substring(1, argEnd)));
+        int argCount = argCount(desc);
 
         startLine();
         boolean isConstructor = name.equals("<init>");
         write("%s%s%s(",
                 modifiers(access),
-                isConstructor ? "" : signatureTotype(desc.substring(argEnd + 1)) + " ",
+                isConstructor ? "" : signatureToType(returnType(desc)) + " ",
                 isConstructor ? classsName : capitalize(name));
         return new CsMethodVisitor(argCount);
     }
@@ -129,15 +134,42 @@ public class CsClassWritter extends ClassVisitor {
                 (accessFlags & Opcodes.ACC_FINAL) != 0 ? "readonly " : "");
     }
 
-    private String signatureTotype(String signature) {
+    private static String argTypes(String desc) {
+        return desc.substring(1, desc.indexOf(')'));
+    }
+
+    private static String returnType(String desc) {
+        return desc.substring(desc.indexOf(')') + 1);
+    }
+
+    private static int argCount(String desc) {
+        return Iterables.size(new DescIterable(argTypes(desc)));
+    }
+
+
+    private static String formatConstant(Object constant) {
+        if (constant == null) {
+            return "null";
+        } else if (constant instanceof String) {
+            return String.format("\"%s\"", constant);
+        } else {
+            return constant.toString();
+        }
+    }
+
+    private static String slashToDot(String path) {
+        return path.replaceAll("/", ".");
+    }
+
+    private String signatureToType(String signature) {
         if (signature.startsWith("[")) {
-            return signatureTotype(signature.substring(1)) + "[]";
+            return signatureToType(signature.substring(1)) + "[]";
         } else {
             switch (signature) {
                 case "V":
                     return "void";
                 case "Z":
-                    return "boolean";
+                    return "bool";
                 case "C":
                     return "char";
                 case "B":
@@ -160,8 +192,7 @@ public class CsClassWritter extends ClassVisitor {
                     String referencedClass = signature.substring(1,
                             signature.length() - 1);
                     dependencyCallback.accept(referencedClass);
-                    return capitalize(referencedClass
-                            .replaceAll("/", "."));
+                    return capitalize(slashToDot(referencedClass));
             }
         }
     }
@@ -169,10 +200,12 @@ public class CsClassWritter extends ClassVisitor {
 
     private class CsMethodVisitor extends MethodVisitor {
         private int argCount;
+        private Deque<String> stack;
 
         public CsMethodVisitor(int argCount) {
             super(Opcodes.ASM5);
             this.argCount = argCount;
+            stack = Lists.newLinkedList();
             writeParamsEnd();
         }
 
@@ -186,16 +219,146 @@ public class CsClassWritter extends ClassVisitor {
                 if (argCount > 0) {
                     argCount--;
                     write("%s %s%s",
-                            signatureTotype(desc),
+                            signatureToType(desc),
                             name,
                             argCount > 0 ? ", " : "");
                     writeParamsEnd();
                 } else {
                     line("%s %s;",
-                            signatureTotype(desc),
+                            signatureToType(desc),
                             name);
                 }
             }
+        }
+
+        @Override
+        public void visitFrame(int type, int nLocal, Object[] local, int nStack, Object[] stack) {
+            super.visitFrame(type, nLocal, local, nStack, stack);
+        }
+
+        @Override
+        public void visitInsn(int opcode) {
+            line("return;");
+        }
+
+        @Override
+        public void visitIntInsn(int opcode, int operand) {
+            stack.push(formatConstant(operand));
+        }
+
+        @Override
+        public void visitVarInsn(int opcode, int var) {
+            super.visitVarInsn(opcode, var);
+        }
+
+        @Override
+        public void visitTypeInsn(int opcode, String type) {
+            super.visitTypeInsn(opcode, type);
+        }
+
+        @Override
+        public void visitFieldInsn(int opcode, String owner, String name, String desc) {
+            switch (opcode) {
+                case Opcodes.GETSTATIC:
+                    startLine();
+                    write("%s.%s", capitalize(slashToDot(owner)), capitalize(name));
+                    return;
+                case Opcodes.PUTFIELD:
+                    String value = stack.pop();
+                    line("this.%s = %s;", name, value);
+                    return;
+            }
+        }
+
+        @Override
+        public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
+            int argCount = argCount(desc);
+
+            List<String> args = Lists.newLinkedList();
+            for (int n=0;n<argCount;n++) {
+                args.add(0, stack.pop());
+            }
+
+            boolean isConstructor = name.equals("<init>");
+            if (isConstructor) {
+                line("base(%s);", Joiner.on(',').join(args));
+            } else {
+                write(".%s(%s);", capitalize(name), Joiner.on(',').join(args));
+                endLine();
+            }
+            stack.clear();
+        }
+
+        @Override
+        public void visitInvokeDynamicInsn(String name, String desc, Handle bsm, Object... bsmArgs) {
+            super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs);
+        }
+
+        @Override
+        public void visitJumpInsn(int opcode, Label label) {
+            super.visitJumpInsn(opcode, label);
+        }
+
+        @Override
+        public void visitLabel(Label label) {
+            super.visitLabel(label);
+        }
+
+        @Override
+        public void visitLdcInsn(Object cst) {
+            stack.push(formatConstant(cst));
+        }
+
+        @Override
+        public void visitIincInsn(int var, int increment) {
+            super.visitIincInsn(var, increment);
+        }
+
+        @Override
+        public void visitTableSwitchInsn(int min, int max, Label dflt, Label... labels) {
+            super.visitTableSwitchInsn(min, max, dflt, labels);
+        }
+
+        @Override
+        public void visitLookupSwitchInsn(Label dflt, int[] keys, Label[] labels) {
+            super.visitLookupSwitchInsn(dflt, keys, labels);
+        }
+
+        @Override
+        public void visitMultiANewArrayInsn(String desc, int dims) {
+            super.visitMultiANewArrayInsn(desc, dims);
+        }
+
+        @Override
+        public AnnotationVisitor visitInsnAnnotation(int typeRef, TypePath typePath, String desc, boolean visible) {
+            return super.visitInsnAnnotation(typeRef, typePath, desc, visible);
+        }
+
+        @Override
+        public void visitTryCatchBlock(Label start, Label end, Label handler, String type) {
+            super.visitTryCatchBlock(start, end, handler, type);
+        }
+
+        @Override
+        public AnnotationVisitor visitTryCatchAnnotation(int typeRef, TypePath typePath, String desc, boolean visible) {
+            return super.visitTryCatchAnnotation(typeRef, typePath, desc, visible);
+        }
+
+        @Override
+        public AnnotationVisitor visitLocalVariableAnnotation(int typeRef, TypePath typePath, Label[] start, Label[] end, int[] index, String desc, boolean visible) {
+            return super.visitLocalVariableAnnotation(typeRef, typePath, start, end, index, desc, visible);
+        }
+
+        @Override
+        public void visitLineNumber(int line, Label start) {
+//            if (!stack.isEmpty()) {
+//                line("%s;", Joiner.on("").join(stack));
+//            }
+        }
+
+        @Override
+        public void visitMaxs(int maxStack, int maxLocals) {
+            super.visitMaxs(maxStack, maxLocals);
         }
 
         @Override
@@ -213,4 +376,6 @@ public class CsClassWritter extends ClassVisitor {
             }
         }
     }
+
+
 }
