@@ -1,4 +1,4 @@
-package org.nibiru.j2cs;
+package org.nibiru.j2x;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;

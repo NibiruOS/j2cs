@@ -1,4 +1,4 @@
-package org.nibiru.j2cs;
+package org.nibiru.j2x;
 
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Joiner;
@@ -85,6 +85,7 @@ public class CsClassWritter extends ClassVisitor {
                 isConstructor ? "" : signatureToType(returnType(desc)) + " ",
                 isConstructor ? classsName : capitalize(name));
         return new CsMethodVisitor(argCount);
+        //return null;
     }
 
     private void startLine() {
@@ -376,6 +377,5 @@ public class CsClassWritter extends ClassVisitor {
             }
         }
     }
-
 
 }

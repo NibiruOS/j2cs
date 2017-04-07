@@ -1,4 +1,4 @@
-package org.nibiru.j2cs;
+package org.nibiru.j2x;
 
 import java.util.Iterator;
 

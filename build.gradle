@@ -4,7 +4,7 @@ apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
 version = '0.1-SNAPSHOT'
-group = 'com.aajtech.nibiru.j2cs'
+group = 'com.aajtech.nibiru.j2x'
 
 repositories {
     mavenCentral()
@@ -39,4 +39,5 @@ dependencies {
 	testCompile "junit:junit:4.12"
     compile 'org.ow2.asm:asm:5.2'
     compile 'com.google.guava:guava:21.0'
+    compile "com.google.code.findbugs:jsr305:2.0.3"
 }
