@@ -1,18 +1,15 @@
 package org.nibiru.j2x.ast;
 
-import javax.annotation.Nullable;
-
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class J2xArray extends J2xClass {
     private final J2xClass itemClass;
 
-    public J2xArray(String name,
-                    String packageName,
-                    @Nullable J2xClass superClass,
-                    J2xAccess access,
-                    J2xClass itemClass) {
-        super(name, packageName, superClass, access);
+    public J2xArray(J2xClass itemClass) {
+        super(itemClass.getName() + "[]",
+                JAVA_LANG_PACKAGE,
+                J2xClass.OBJECT,
+                J2xAccess.PUBLIC);
         this.itemClass = checkNotNull(itemClass);
     }
 

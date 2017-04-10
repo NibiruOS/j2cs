@@ -12,6 +12,7 @@ import org.nibiru.j2x.ast.J2xConstructor;
 import org.nibiru.j2x.ast.J2xField;
 import org.nibiru.j2x.ast.J2xMember;
 import org.nibiru.j2x.ast.J2xMethod;
+import org.nibiru.j2x.ast.J2xVariable;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -66,18 +67,26 @@ public class CsWritter {
                         ? ""
                         : method.getType().getFullName() + " ",
                 capitalize(method.getName()),
-                Joiner.on(',').join(method.getArguments()));
+                Joiner.on(',').join(Iterables.transform(method.getArguments(), CsWritter::variable)));
         line("}");
     }
 
-    private String access(J2xAccess access) {
+    private static String variable(J2xVariable variable) {
+        return String.format("%s %s", variable.getType().isPrimitive()
+                        ? variable.getType().getFullName()
+                        : capitalize(variable.getType().getFullName()),
+                variable.getName());
+    }
+
+    private static String access(J2xAccess access) {
         if (access == J2xAccess.PUBLIC) {
             return "public ";
         } else {
             return "";
         }
     }
-    private String modifiers(J2xMember member) {
+
+    private static String modifiers(J2xMember member) {
         return String.format("%s%s%s",
                 access(member.getAccess()),
                 member.isStatic() ? "static " : "",

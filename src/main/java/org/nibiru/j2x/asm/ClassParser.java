@@ -1,12 +1,12 @@
 package org.nibiru.j2x.asm;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 import org.nibiru.j2x.DescIterable;
 import org.nibiru.j2x.ast.J2xAccess;
+import org.nibiru.j2x.ast.J2xArray;
 import org.nibiru.j2x.ast.J2xBlock;
 import org.nibiru.j2x.ast.J2xClass;
 import org.nibiru.j2x.ast.J2xConstructor;
@@ -27,29 +27,53 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Deque;
+import java.util.List;
 import java.util.Map;
 
 public class ClassParser extends ClassVisitor {
-    public static Map<String, J2xClass> parse(String classPath) {
+    private static Map<String, J2xClass> systemClasses = Maps.newHashMap();
+
+    static {
         try {
-            Map<String, J2xClass> generatedClasses = Maps.newHashMap();
-
-
             for (Field field : J2xClass.class.getFields()) {
                 if (Modifier.isStatic(field.getModifiers()) && field.getType().equals(J2xClass.class)) {
                     J2xClass value = (J2xClass) field.get(null);
 
-                    generatedClasses.put((value.getPackageName().isEmpty()
+                    systemClasses.put((value.getPackageName().isEmpty()
                             ? ""
                             : value.getPackageName().replaceAll("\\.", "/")
                             + "/") + value.getName(), value);
                 }
             }
-
-            new ClassParser(generatedClasses).parseInternal(classPath);
-            return generatedClasses;
         } catch (IllegalAccessException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    public static Map<String, J2xClass> parse(String classPath) {
+        Map<String, J2xClass> generatedClasses = Maps.newHashMap();
+
+        parseClassPath(classPath, generatedClasses);
+
+        return generatedClasses;
+    }
+
+    private static J2xClass parseClassPath(String classPath, Map<String, J2xClass> generatedClasses) {
+        J2xClass systemClass = systemClasses.get(classPath);
+        if (systemClass != null) {
+            return systemClass;
+        }
+        J2xClass generatedClass = generatedClasses.get(classPath);
+        if (generatedClass != null) {
+            return systemClass;
+        }
+        if (classPath.endsWith("[]")) {
+            String itemClassPath = classPath.substring(0, classPath.length() - 2);
+            J2xArray array = new J2xArray(parseClassPath(itemClassPath, generatedClasses));
+            systemClasses.put(classPath, array);
+            return array;
+        } else {
+            return new ClassParser(generatedClasses).parseInternal(classPath);
         }
     }
 
@@ -61,13 +85,15 @@ public class ClassParser extends ClassVisitor {
         this.generatedClasses = generatedClasses;
     }
 
+    private J2xClass parseDesc(String desc) {
+        return parseClassPath(descToPath(desc), generatedClasses);
+    }
+
     private J2xClass parseInternal(String classPath) {
         try {
-            if (!generatedClasses.containsKey(classPath)) {
-                ClassReader reader = new ClassReader(Class.class
-                        .getResourceAsStream(String.format("/%s.class", classPath)));
-                reader.accept(this, 0);
-            }
+            ClassReader reader = new ClassReader(Class.class
+                    .getResourceAsStream(String.format("/%s.class", classPath)));
+            reader.accept(this, 0);
             return generatedClasses.get(classPath);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -97,7 +123,7 @@ public class ClassParser extends ClassVisitor {
                                    String signature,
                                    Object value) {
         j2xClass.getFields().add(new J2xField(name,
-                new ClassParser(generatedClasses).parseInternal(descToPath(desc)),
+                parseDesc(desc),
                 access(access),
                 isStatic(access),
                 isFinal(access)));
@@ -174,7 +200,10 @@ public class ClassParser extends ClassVisitor {
         private final String desc;
         private final String signature;
         private final String[] exceptions;
-        private final int argCount;
+
+        private final List<J2xVariable> arguments;
+
+        private int argCount;
         private final Deque<String> stack;
 
         private CsMethodVisitor(int access,
@@ -188,8 +217,11 @@ public class ClassParser extends ClassVisitor {
             this.desc = desc;
             this.signature = signature;
             this.exceptions = exceptions;
+
+            arguments = Lists.newArrayList();
+
             stack = Lists.newLinkedList();
-            this.argCount = argCount(desc);
+            argCount = argCount(desc);
         }
 
         public void visitLocalVariable(String name,
@@ -198,20 +230,21 @@ public class ClassParser extends ClassVisitor {
                                        Label start,
                                        Label end,
                                        int index) {
-//            if (!name.equals("this")) {
-//                if (argCount > 0) {
-//                    argCount--;
+            if (!name.equals("this")) {
+                if (argCount > 0) {
+                    argCount--;
+                    arguments.add(new J2xVariable(name, parseDesc(desc)));
 //                    write("%s %s%s",
 //                            signatureToType(desc),
 //                            name,
 //                            argCount > 0 ? ", " : "");
 //                    writeParamsEnd();
-//                } else {
+                } else {
 //                    line("%s %s;",
 //                            signatureToType(desc),
 //                            name);
-//                }
-//            }
+                }
+            }
         }
 
         @Override
@@ -352,14 +385,14 @@ public class ClassParser extends ClassVisitor {
                     access(access),
                     isStatic(access),
                     isFinal(access),
-                    ImmutableList.<J2xVariable>of(),
+                    arguments,
                     new J2xBlock())
                     : new J2xMethod(name,
-                    new ClassParser(generatedClasses).parseInternal(descToPath(returnType(desc))),
+                    parseDesc(returnType(desc)),
                     access(access),
                     isStatic(access),
                     isFinal(access),
-                    ImmutableList.<J2xVariable>of(),
+                    arguments,
                     new J2xBlock());
             j2xClass.getMethods().add(method);
         }
