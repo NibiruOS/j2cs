@@ -4,7 +4,7 @@ apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
 version = '0.1-SNAPSHOT'
-group = 'com.aajtech.nibiru.j2x'
+group = 'io.github.nibiruos.j2x'
 
 repositories {
     mavenCentral()

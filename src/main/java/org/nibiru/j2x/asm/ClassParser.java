@@ -65,7 +65,7 @@ public class ClassParser extends ClassVisitor {
         }
         J2xClass generatedClass = generatedClasses.get(classPath);
         if (generatedClass != null) {
-            return systemClass;
+            return generatedClass;
         }
         if (classPath.endsWith("[]")) {
             String itemClassPath = classPath.substring(0, classPath.length() - 2);
@@ -202,6 +202,7 @@ public class ClassParser extends ClassVisitor {
         private final String[] exceptions;
 
         private final List<J2xVariable> arguments;
+        private final J2xBlock body;
 
         private int argCount;
         private final Deque<String> stack;
@@ -219,6 +220,7 @@ public class ClassParser extends ClassVisitor {
             this.exceptions = exceptions;
 
             arguments = Lists.newArrayList();
+            body = new J2xBlock();
 
             stack = Lists.newLinkedList();
             argCount = argCount(desc);
@@ -234,11 +236,6 @@ public class ClassParser extends ClassVisitor {
                 if (argCount > 0) {
                     argCount--;
                     arguments.add(new J2xVariable(name, parseDesc(desc)));
-//                    write("%s %s%s",
-//                            signatureToType(desc),
-//                            name,
-//                            argCount > 0 ? ", " : "");
-//                    writeParamsEnd();
                 } else {
 //                    line("%s %s;",
 //                            signatureToType(desc),
@@ -386,14 +383,14 @@ public class ClassParser extends ClassVisitor {
                     isStatic(access),
                     isFinal(access),
                     arguments,
-                    new J2xBlock())
+                    body)
                     : new J2xMethod(name,
                     parseDesc(returnType(desc)),
                     access(access),
                     isStatic(access),
                     isFinal(access),
                     arguments,
-                    new J2xBlock());
+                    body);
             j2xClass.getMethods().add(method);
         }
 

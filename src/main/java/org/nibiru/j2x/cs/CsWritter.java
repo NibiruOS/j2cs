@@ -67,7 +67,7 @@ public class CsWritter {
                         ? ""
                         : method.getType().getFullName() + " ",
                 capitalize(method.getName()),
-                Joiner.on(',').join(Iterables.transform(method.getArguments(), CsWritter::variable)));
+                Joiner.on(", ").join(Iterables.transform(method.getArguments(), CsWritter::variable)));
         line("}");
     }
 

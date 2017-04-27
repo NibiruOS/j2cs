@@ -11,11 +11,11 @@ public class Hola {
     public void simple() {
         System.out.println("hola");
     }
-/*
-    public Hola(Preconditions p, boolean x) {
+    public Hola(Preconditions pepito, boolean x) {
         super();
     }
 
+/*
     public <T> String saludar(boolean bien, T otro) {
         boolean mal = !bien;
         if (mal) {
