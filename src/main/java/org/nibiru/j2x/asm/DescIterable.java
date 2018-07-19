@@ -2,6 +2,8 @@ package org.nibiru.j2x.asm;
 
 import java.util.Iterator;
 
+import javax.annotation.Nonnull;
+
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class DescIterable implements Iterable<String> {
@@ -12,6 +14,7 @@ public class DescIterable implements Iterable<String> {
     }
 
     @Override
+    @Nonnull
     public Iterator<String> iterator() {
         return new DescIterator(data);
     }

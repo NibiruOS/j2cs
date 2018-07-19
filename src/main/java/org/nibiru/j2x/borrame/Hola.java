@@ -2,10 +2,16 @@ package org.nibiru.j2x.borrame;
 
 import com.google.common.base.Preconditions;
 
+import java.util.Date;
+
 public class Hola {
+//    public Hola() {
+//        int x = 2;
+//    }
     //    final String saludo = "hola";
-    public int[][] kkck = null;
-    public String[] otro;
+//    public int kkck = 123;
+//    public String[] otro;
+    //public Date[][] fechas;
 //    boolean zxing;
 //
 //    public void simple() {
@@ -15,12 +21,13 @@ public class Hola {
 //        super();
 //    }
 //
-//    public <T> String saludar(boolean bien, T otro) {
-//        boolean mal = !bien;
+//    public void saludar() {
+        //boolean mal = true;
 //        if (mal) {
 //            return "Hola guampa";
 //        } else {
 //            return "Hola";
 //        }
+        //return "Hola";
 //    }
 }

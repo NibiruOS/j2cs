@@ -1,6 +1,7 @@
 package org.nibiru.j2x.ast;
 
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 
 import java.util.Collection;
@@ -20,7 +21,21 @@ public class J2xClass {
     public static final J2xClass FLOAT = new J2xClass("float");
     public static final J2xClass LONG = new J2xClass("long");
     public static final J2xClass DOUBLE = new J2xClass("double");
-    public static final J2xClass OBJECT = new J2xClass("Object", JAVA_LANG_PACKAGE);
+    public static final J2xClass OBJECT = buildObjectClass();
+
+    private static J2xClass buildObjectClass() {
+        J2xClass clazz = new J2xClass("Object", JAVA_LANG_PACKAGE);
+        clazz.getMethods().add(new J2xMethod(J2xMethod.CONSTRUCTOR_NAME,
+                J2xClass.VOID,
+                J2xAccess.PUBLIC,
+                false,
+                false,
+                "()V",
+                ImmutableList.of(),
+                new J2xBlock()));
+        return clazz;
+    }
+
     public static final J2xClass STRING = new J2xClass("String", JAVA_LANG_PACKAGE);
 
     private final String name;
@@ -96,5 +111,14 @@ public class J2xClass {
 
     public String getFullName() {
         return (Strings.isNullOrEmpty(packageName) ? "" : (packageName + ".")) + name;
+    }
+
+    public J2xMethod findMethod(String name, String desc) {
+        for (J2xMethod method : methods) {
+            if (method.getName().equals(name)) {
+                return method;
+            }
+        }
+        return null;
     }
 }

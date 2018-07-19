@@ -1,5 +1,6 @@
 package org.nibiru.j2x.asm;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -8,10 +9,11 @@ import org.nibiru.j2x.ast.J2xAccess;
 import org.nibiru.j2x.ast.J2xArray;
 import org.nibiru.j2x.ast.J2xBlock;
 import org.nibiru.j2x.ast.J2xClass;
-import org.nibiru.j2x.ast.J2xConstructor;
 import org.nibiru.j2x.ast.J2xField;
 import org.nibiru.j2x.ast.J2xMethod;
-import org.nibiru.j2x.ast.J2xVariable;
+import org.nibiru.j2x.ast.element.J2xConstant;
+import org.nibiru.j2x.ast.element.J2xVariable;
+import org.nibiru.j2x.ast.sentence.J2xMethodCallSentence;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
@@ -25,7 +27,6 @@ import org.objectweb.asm.TypePath;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 
@@ -223,7 +224,7 @@ public class ClassParser extends ClassVisitor {
         private final J2xBlock body;
 
         private int argCount;
-        private final Deque<String> stack;
+        private final Stack stack;
 
         private CsMethodVisitor(int access,
                                 String name,
@@ -240,7 +241,7 @@ public class ClassParser extends ClassVisitor {
             arguments = Lists.newArrayList();
             body = new J2xBlock();
 
-            stack = Lists.newLinkedList();
+            stack = new Stack();
             argCount = argCount(desc);
         }
 
@@ -251,35 +252,56 @@ public class ClassParser extends ClassVisitor {
                                        Label end,
                                        int index) {
             if (!name.equals("this")) {
+                J2xVariable variable = new J2xVariable(name, parseDesc(desc));
                 if (argCount > 0) {
                     argCount--;
-                    arguments.add(new J2xVariable(name, parseDesc(desc)));
+                    arguments.add(variable);
                 } else {
-//                    line("%s %s;",
-//                            signatureToType(desc),
-//                            name);
+                    body.getVariables().add(variable);
                 }
             }
         }
 
         @Override
         public void visitFrame(int type, int nLocal, Object[] local, int nStack, Object[] stack) {
+            System.out.print("");
             super.visitFrame(type, nLocal, local, nStack, stack);
         }
 
         @Override
         public void visitInsn(int opcode) {
-//            line("return;");
+            switch (opcode) {
+                case Opcodes.LNEG:
+                    break;
+                case Opcodes.ICONST_0:
+                    stack.push(new J2xConstant(0));
+                    break;
+                case Opcodes.ICONST_1:
+                    stack.push(new J2xConstant(1));
+                    break;
+            }
         }
 
         @Override
         public void visitIntInsn(int opcode, int operand) {
-//            stack.push(formatConstant(operand));
+            switch (opcode) {
+                case Opcodes.ALOAD:
+                    stack.push(new J2xConstant(operand));
+                    break;
+            }
         }
 
         @Override
         public void visitVarInsn(int opcode, int var) {
-            super.visitVarInsn(opcode, var);
+            switch (opcode) {
+                case Opcodes.ALOAD:
+                    stack.push(new J2xVariable(var == 0
+                            ? "this"
+                            : "_" + var, J2xClass.OBJECT));
+                    break;
+                case Opcodes.ISTORE:
+                    break;
+            }
         }
 
         @Override
@@ -289,35 +311,21 @@ public class ClassParser extends ClassVisitor {
 
         @Override
         public void visitFieldInsn(int opcode, String owner, String name, String desc) {
-//            switch (opcode) {
-//                case Opcodes.GETSTATIC:
-//                    startLine();
-//                    write("%s.%s", capitalize(slashToDot(owner)), capitalize(name));
-//                    return;
-//                case Opcodes.PUTFIELD:
-//                    String value = stack.pop();
-//                    line("this.%s = %s;", name, value);
-//                    return;
-//            }
+            switch (opcode) {
+                case Opcodes.INVOKESPECIAL:
+                    break;
+            }
         }
 
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
-//            int argCount = argCount(desc);
-//
-//            List<String> args = Lists.newLinkedList();
-//            for (int n = 0; n < argCount; n++) {
-//                args.add(0, stack.pop());
-//            }
-//
-//            boolean isConstructor = name.equals("<init>");
-//            if (isConstructor) {
-//                line("base(%s);", Joiner.on(',').join(args));
-//            } else {
-//                write(".%s(%s);", capitalize(name), Joiner.on(',').join(args));
-//                endLine();
-//            }
-//            stack.clear();
+            switch (opcode) {
+                case Opcodes.INVOKESPECIAL:
+                    body.getSentences().add(new J2xMethodCallSentence(stack.pop(),
+                            parseClassPath(owner, generatedClasses).findMethod(name, desc),
+                            ImmutableList.of())); // TODO: parsear desc y sacar elementos del stack
+                    break;
+            }
         }
 
         @Override
@@ -337,7 +345,6 @@ public class ClassParser extends ClassVisitor {
 
         @Override
         public void visitLdcInsn(Object cst) {
-//            stack.push(formatConstant(cst));
         }
 
         @Override
@@ -382,9 +389,6 @@ public class ClassParser extends ClassVisitor {
 
         @Override
         public void visitLineNumber(int line, Label start) {
-//            if (!stack.isEmpty()) {
-//                line("%s;", Joiner.on("").join(stack));
-//            }
         }
 
         @Override
@@ -394,19 +398,12 @@ public class ClassParser extends ClassVisitor {
 
         @Override
         public void visitEnd() {
-            J2xMethod method = name.equals("<init>")
-                    ? new J2xConstructor(j2xClass.getName(),
-                    J2xClass.VOID,
-                    access(access),
-                    isStatic(access),
-                    isFinal(access),
-                    arguments,
-                    body)
-                    : new J2xMethod(name,
+            J2xMethod method = new J2xMethod(name,
                     parseDesc(returnType(desc)),
                     access(access),
                     isStatic(access),
                     isFinal(access),
+                    desc,
                     arguments,
                     body);
             j2xClass.getMethods().add(method);

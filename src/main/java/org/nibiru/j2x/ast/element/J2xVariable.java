@@ -1,9 +1,11 @@
-package org.nibiru.j2x.ast;
+package org.nibiru.j2x.ast.element;
 
+
+import org.nibiru.j2x.ast.J2xClass;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-public class J2xVariable {
+public class J2xVariable extends J2xElement {
     private final String name;
     private final J2xClass type;
 

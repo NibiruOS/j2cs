@@ -10,11 +10,12 @@ import com.google.common.collect.Iterables;
 import org.nibiru.j2x.ast.J2xAccess;
 import org.nibiru.j2x.ast.J2xArray;
 import org.nibiru.j2x.ast.J2xClass;
-import org.nibiru.j2x.ast.J2xConstructor;
 import org.nibiru.j2x.ast.J2xField;
 import org.nibiru.j2x.ast.J2xMember;
 import org.nibiru.j2x.ast.J2xMethod;
-import org.nibiru.j2x.ast.J2xVariable;
+import org.nibiru.j2x.ast.element.J2xVariable;
+import org.nibiru.j2x.ast.sentence.J2xMethodCallSentence;
+import org.nibiru.j2x.ast.sentence.J2xSentence;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -49,7 +50,7 @@ public class CsWritter {
             }
 
             for (J2xMethod method : j2xClass.getMethods()) {
-                write(method);
+                write(j2xClass, method);
             }
             indentation--;
             line("}");
@@ -68,18 +69,57 @@ public class CsWritter {
                 field.getName());
     }
 
-    private void write(J2xMethod method) {
-        line("%s%s%s(%s) {",
+    private void write(J2xClass j2xClass, J2xMethod method) {
+
+
+        line("%s%s%s(%s) %s {",
                 modifiers(method),
-                method instanceof J2xConstructor
+                method.isConstructor()
                         ? ""
                         : type(method.getType()) + " ",
-                capitalize(method.getName()),
+                capitalize(method.isConstructor()
+                        ? j2xClass.getName()
+                        : method.getName()),
                 Joiner.on(", ").join(StreamSupport.stream(method.getArguments().spliterator(), false)
                         .map(CsWritter::variable)
-                        .collect(Collectors.toList())));
+                        .collect(Collectors.toList())),
+                method.getBody().getSentences().isEmpty() && isSuperCall(method.getBody().getSentences().get(0)) // TODO: arreglar esto que est are feo y no anda
+                        ? " : super(" + buildArgs((J2xMethodCallSentence) method.getBody().getSentences().get(0)) + ")"
+                        : "");
+
+        indentation++;
+        for (J2xVariable variable : method.getBody().getVariables()) {
+            line(type(variable.getType()) + " " + variable.getName() + ";");
+        }
+        for (J2xSentence sentence : method.getBody().getSentences()) {
+            if (sentence instanceof J2xMethodCallSentence && !isSuperCall(sentence)) {
+                J2xMethodCallSentence callSentence = (J2xMethodCallSentence) sentence;
+                line(callSentence.getTarget().getName()
+                        + "."
+                        + callSentence.getMethod().getName()
+                        + "("
+                        + buildArgs(callSentence)
+                        + ");");
+
+            }
+        }
+
+        indentation--;
 
         line("}");
+    }
+
+    private static boolean isSuperCall(J2xSentence sentence) {
+        if (sentence instanceof J2xMethodCallSentence) {
+            J2xMethodCallSentence callSentence = (J2xMethodCallSentence) sentence;
+            return callSentence.getMethod().isConstructor();
+        } else {
+            return false;
+        }
+    }
+
+    private static String buildArgs(J2xMethodCallSentence callSentence) {
+        return Joiner.on(',').join(callSentence.getArgs());
     }
 
     private static String variable(J2xVariable variable) {
