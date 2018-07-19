@@ -4,9 +4,11 @@ import com.google.common.base.CaseFormat;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 
 import org.nibiru.j2x.ast.J2xAccess;
+import org.nibiru.j2x.ast.J2xArray;
 import org.nibiru.j2x.ast.J2xClass;
 import org.nibiru.j2x.ast.J2xConstructor;
 import org.nibiru.j2x.ast.J2xField;
@@ -16,10 +18,16 @@ import org.nibiru.j2x.ast.J2xVariable;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class CsWritter {
+    private static final Map<String, String> PREDEFINED_TYPES =
+            ImmutableMap.of(Object.class.getName(), "object",
+                    String.class.getName(), "string");
     private final Writer out;
     private final boolean pretty;
     private int indentation;
@@ -56,7 +64,7 @@ public class CsWritter {
     private void write(J2xField field) {
         line("%s%s %s;",
                 modifiers(field),
-                field.getType().getFullName(),
+                type(field.getType()),
                 field.getName());
     }
 
@@ -65,17 +73,30 @@ public class CsWritter {
                 modifiers(method),
                 method instanceof J2xConstructor
                         ? ""
-                        : method.getType().getFullName() + " ",
+                        : type(method.getType()) + " ",
                 capitalize(method.getName()),
-                Joiner.on(", ").join(Iterables.transform(method.getArguments(), CsWritter::variable)));
+                Joiner.on(", ").join(StreamSupport.stream(method.getArguments().spliterator(), false)
+                        .map(CsWritter::variable)
+                        .collect(Collectors.toList())));
+
         line("}");
     }
 
     private static String variable(J2xVariable variable) {
-        return String.format("%s %s", variable.getType().isPrimitive()
-                        ? variable.getType().getFullName()
-                        : capitalize(variable.getType().getFullName()),
+        return String.format("%s %s",
+                type(variable.getType()),
                 variable.getName());
+    }
+
+    private static String type(J2xClass type) {
+        if (type instanceof J2xArray) {
+            J2xArray arrayType = (J2xArray) type;
+            return type(arrayType.getItemClass()) + Strings.repeat("[]", arrayType.getDimensions());
+        } else {
+            return type.isPrimitive() ?
+                    type.getName()
+                    : PREDEFINED_TYPES.getOrDefault(type.getFullName(), capitalize(type.getFullName()));
+        }
     }
 
     private static String access(J2xAccess access) {

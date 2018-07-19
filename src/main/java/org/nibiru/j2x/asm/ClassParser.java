@@ -4,7 +4,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
-import org.nibiru.j2x.DescIterable;
 import org.nibiru.j2x.ast.J2xAccess;
 import org.nibiru.j2x.ast.J2xArray;
 import org.nibiru.j2x.ast.J2xBlock;
@@ -67,14 +66,33 @@ public class ClassParser extends ClassVisitor {
         if (generatedClass != null) {
             return generatedClass;
         }
-        if (classPath.endsWith("[]")) {
-            String itemClassPath = classPath.substring(0, classPath.length() - 2);
-            J2xArray array = new J2xArray(parseClassPath(itemClassPath, generatedClasses));
+        int dimensions = extractDimensions(classPath);
+        if (dimensions > 0) {
+            String itemClassPath = extractName(classPath);
+            J2xArray array = new J2xArray(parseClassPath(itemClassPath, generatedClasses),
+                    dimensions);
             systemClasses.put(classPath, array);
             return array;
         } else {
             return new ClassParser(generatedClasses).parseInternal(classPath);
         }
+    }
+
+    private static String extractName(String name) {
+        int pos = name.indexOf(J2xArray.ARRAY);
+        return pos >= 0
+                ? name.substring(0, pos)
+                : name;
+    }
+
+    private static int extractDimensions(String name) {
+        int dimensions = 0;
+        int pos = name.indexOf(J2xArray.ARRAY);
+        while (pos >= 0) {
+            dimensions++;
+            pos = name.indexOf(J2xArray.ARRAY, pos + 1);
+        }
+        return dimensions;
     }
 
     private final Map<String, J2xClass> generatedClasses;

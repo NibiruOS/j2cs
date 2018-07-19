@@ -10,7 +10,7 @@ import javax.annotation.Nullable;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class J2xClass {
-    public static String JAVA_LANG_PACKAGE = "java.lang";
+    static String JAVA_LANG_PACKAGE = "java.lang";
     public static final J2xClass VOID = new J2xClass("void");
     public static final J2xClass BOOL = new J2xClass("bool");
     public static final J2xClass CHAR = new J2xClass("char");
