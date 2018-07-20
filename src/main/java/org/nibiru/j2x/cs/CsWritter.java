@@ -14,8 +14,9 @@ import org.nibiru.j2x.ast.J2xClass;
 import org.nibiru.j2x.ast.J2xField;
 import org.nibiru.j2x.ast.J2xMember;
 import org.nibiru.j2x.ast.J2xMethod;
-import org.nibiru.j2x.ast.element.J2xConstant;
-import org.nibiru.j2x.ast.element.J2xElement;
+import org.nibiru.j2x.ast.element.J2xAssignment;
+import org.nibiru.j2x.ast.element.J2xLiteral;
+import org.nibiru.j2x.ast.element.J2xReturn;
 import org.nibiru.j2x.ast.element.J2xVariable;
 import org.nibiru.j2x.ast.element.J2xMethodCall;
 
@@ -99,7 +100,7 @@ public class CsWritter {
                 line(type(variable.getType()) + " " + variable.getName() + ";");
             }
         }
-        for (J2xElement element : method.getBody().getElements()) {
+        for (Object element : method.getBody().getElements()) {
             String line = element(element);
             if (line != null) {
                 line(line);
@@ -111,13 +112,17 @@ public class CsWritter {
         line("}");
     }
 
-    private static String element(J2xElement element) {
+    private static String element(Object element) {
         if (element instanceof J2xMethodCall) {
             return methodCallElement((J2xMethodCall) element);
-        } else if (element instanceof J2xConstant) {
-            return literalElement((J2xConstant) element);
+        } else if (element instanceof J2xLiteral) {
+            return literalElement((J2xLiteral) element);
         } else if (element instanceof J2xVariable) {
             return variableElement((J2xVariable) element);
+        } else if (element instanceof J2xAssignment) {
+            return assignmentElement((J2xAssignment) element);
+        } else if (element instanceof J2xReturn) {
+            return returnElement((J2xReturn) element);
         } else {
             throw new IllegalArgumentException();
         }
@@ -136,7 +141,7 @@ public class CsWritter {
         }
     }
 
-    private static String literalElement(J2xConstant element) {
+    private static String literalElement(J2xLiteral element) {
         return "" + element.getValue();
     }
 
@@ -144,18 +149,29 @@ public class CsWritter {
         return element.getName();
     }
 
+    private static String assignmentElement(J2xAssignment element) {
+        return element(element.getTarget()) + " = " + element(element.getValue()) + ";";
+    }
+
+    private static String returnElement(J2xReturn element) {
+        return "return" + (element.getValue() != null
+                ? " " + element(element.getValue())
+                : "")
+                + ";";
+    }
+
     private static J2xMethodCall getSuperCall(J2xBlock block) {
         if (block.getElements().isEmpty()) {
             return null;
         } else {
-            J2xElement element = block.getElements().get(0);
+            Object element = block.getElements().get(0);
             return isSuperCall(element)
                     ? (J2xMethodCall) element
                     : null;
         }
     }
 
-    private static boolean isSuperCall(J2xElement element) {
+    private static boolean isSuperCall(Object element) {
         if (element instanceof J2xMethodCall) {
             J2xMethodCall callSentence = (J2xMethodCall) element;
             return callSentence.getMethod().isConstructor();

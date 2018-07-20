@@ -5,7 +5,7 @@ import org.nibiru.j2x.ast.J2xClass;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-public class J2xVariable extends J2xElement {
+public class J2xVariable {
     private final static String THIS_NAME = "this";
     private String name;
     private J2xClass type;

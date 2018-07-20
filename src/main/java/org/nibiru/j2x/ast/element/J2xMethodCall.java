@@ -6,14 +6,14 @@ import java.util.List;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-public class J2xMethodCall extends J2xElement {
+public class J2xMethodCall {
     private final J2xVariable target;
     private final J2xMethod method;
-    private final List<J2xElement> args;
+    private final List<Object> args;
 
     public J2xMethodCall(J2xVariable target,
                          J2xMethod method,
-                         List<J2xElement> args) {
+                         List<Object> args) {
         this.target = checkNotNull(target);
         this.method = checkNotNull(method);
         this.args = checkNotNull(args);
@@ -27,7 +27,7 @@ public class J2xMethodCall extends J2xElement {
         return method;
     }
 
-    public List<J2xElement> getArgs() {
+    public List<Object> getArgs() {
         return args;
     }
 }

@@ -1,9 +1,9 @@
 package org.nibiru.j2x.ast.element;
 
-public class J2xConstant extends J2xElement {
+public class J2xLiteral {
     private final Object value;
 
-    public J2xConstant(Object value) {
+    public J2xLiteral(Object value) {
         this.value = value;
     }
 

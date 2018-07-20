@@ -1,6 +1,5 @@
 package org.nibiru.j2x.asm;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -11,8 +10,9 @@ import org.nibiru.j2x.ast.J2xBlock;
 import org.nibiru.j2x.ast.J2xClass;
 import org.nibiru.j2x.ast.J2xField;
 import org.nibiru.j2x.ast.J2xMethod;
-import org.nibiru.j2x.ast.element.J2xConstant;
-import org.nibiru.j2x.ast.element.J2xElement;
+import org.nibiru.j2x.ast.element.J2xAssignment;
+import org.nibiru.j2x.ast.element.J2xLiteral;
+import org.nibiru.j2x.ast.element.J2xReturn;
 import org.nibiru.j2x.ast.element.J2xVariable;
 import org.nibiru.j2x.ast.element.J2xMethodCall;
 import org.objectweb.asm.AnnotationVisitor;
@@ -277,16 +277,28 @@ public class ClassParser extends ClassVisitor {
                 case Opcodes.LNEG:
                     break;
                 case Opcodes.ICONST_0:
-                    stack.push(new J2xConstant(0));
+                    stack.push(new J2xLiteral(0));
                     break;
                 case Opcodes.ICONST_1:
-                    stack.push(new J2xConstant(1));
+                    stack.push(new J2xLiteral(1));
                     break;
                 case Opcodes.ICONST_2:
-                    stack.push(new J2xConstant(2));
+                    stack.push(new J2xLiteral(2));
                     break;
                 case Opcodes.ICONST_3:
-                    stack.push(new J2xConstant(3));
+                    stack.push(new J2xLiteral(3));
+                    break;
+                case Opcodes.ICONST_4:
+                    stack.push(new J2xLiteral(4));
+                    break;
+                case Opcodes.ICONST_5:
+                    stack.push(new J2xLiteral(5));
+                    break;
+                case Opcodes.IRETURN:
+                    body.getElements().add(new J2xReturn(stack.pop()));
+                    break;
+                case Opcodes.RETURN:
+                    body.getElements().add(new J2xReturn());
                     break;
             }
         }
@@ -295,7 +307,8 @@ public class ClassParser extends ClassVisitor {
         public void visitIntInsn(int opcode, int operand) {
             switch (opcode) {
                 case Opcodes.ALOAD:
-                    stack.push(new J2xConstant(operand));
+                case Opcodes.SIPUSH:
+                    stack.push(new J2xLiteral(operand));
                     break;
             }
         }
@@ -308,6 +321,7 @@ public class ClassParser extends ClassVisitor {
                     stack.push(variable);
                     break;
                 case Opcodes.ISTORE:
+                    body.getElements().add(new J2xAssignment(variable, stack.pop()));
                     break;
             }
         }
@@ -329,7 +343,7 @@ public class ClassParser extends ClassVisitor {
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
             switch (opcode) {
                 case Opcodes.INVOKESPECIAL:
-                    List<J2xElement> args = Lists.newArrayList();
+                    List<Object> args = Lists.newArrayList();
                     for (Object dummy : new DescIterable(desc.substring(desc.indexOf("(") + 1, desc.indexOf(")")))) {
                         args.add(stack.pop());
                     }

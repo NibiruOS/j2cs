@@ -6,10 +6,14 @@ import java.util.Date;
 
 public class Hola extends BaseClase {
     public Hola() {
-        super(3);
-//        pepe = 2;
+        super(300);
+        int pepe =789;
 //        String caca ="pablo";
 //        caca.toString();
+    }
+
+    private static int numero() {
+        return 2;
     }
     //    final String saludo = "hola";
 //    public int kkck = 123;
