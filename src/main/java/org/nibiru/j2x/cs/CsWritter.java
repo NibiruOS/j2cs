@@ -9,13 +9,15 @@ import com.google.common.collect.Iterables;
 
 import org.nibiru.j2x.ast.J2xAccess;
 import org.nibiru.j2x.ast.J2xArray;
+import org.nibiru.j2x.ast.J2xBlock;
 import org.nibiru.j2x.ast.J2xClass;
 import org.nibiru.j2x.ast.J2xField;
 import org.nibiru.j2x.ast.J2xMember;
 import org.nibiru.j2x.ast.J2xMethod;
+import org.nibiru.j2x.ast.element.J2xConstant;
+import org.nibiru.j2x.ast.element.J2xElement;
 import org.nibiru.j2x.ast.element.J2xVariable;
-import org.nibiru.j2x.ast.sentence.J2xMethodCallSentence;
-import org.nibiru.j2x.ast.sentence.J2xSentence;
+import org.nibiru.j2x.ast.element.J2xMethodCall;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -42,7 +44,9 @@ public class CsWritter {
         try {
             line("namespace %s {", capitalize(j2xClass.getPackageName()));
             indentation++;
-            line("%sclass %s {", access(j2xClass.getAccess()), j2xClass.getName());
+            line("%sclass %s%s {", access(j2xClass.getAccess()),
+                    j2xClass.getName(),
+                    (j2xClass.getSuperClass() == null || j2xClass.getSuperClass().equals(J2xClass.OBJECT)) ? "" : (" : " + capitalize(j2xClass.getSuperClass().getFullName())));
             indentation++;
 
             for (J2xField field : j2xClass.getFields()) {
@@ -72,6 +76,8 @@ public class CsWritter {
     private void write(J2xClass j2xClass, J2xMethod method) {
 
 
+        J2xMethodCall superCall = getSuperCall(method.getBody());
+
         line("%s%s%s(%s) %s {",
                 modifiers(method),
                 method.isConstructor()
@@ -83,24 +89,20 @@ public class CsWritter {
                 Joiner.on(", ").join(StreamSupport.stream(method.getArguments().spliterator(), false)
                         .map(CsWritter::variable)
                         .collect(Collectors.toList())),
-                method.getBody().getSentences().isEmpty() && isSuperCall(method.getBody().getSentences().get(0)) // TODO: arreglar esto que est are feo y no anda
-                        ? " : super(" + buildArgs((J2xMethodCallSentence) method.getBody().getSentences().get(0)) + ")"
+                superCall != null
+                        ? " : base(" + buildArgs(superCall) + ")"
                         : "");
 
         indentation++;
         for (J2xVariable variable : method.getBody().getVariables()) {
-            line(type(variable.getType()) + " " + variable.getName() + ";");
+            if (!variable.isThis()) {
+                line(type(variable.getType()) + " " + variable.getName() + ";");
+            }
         }
-        for (J2xSentence sentence : method.getBody().getSentences()) {
-            if (sentence instanceof J2xMethodCallSentence && !isSuperCall(sentence)) {
-                J2xMethodCallSentence callSentence = (J2xMethodCallSentence) sentence;
-                line(callSentence.getTarget().getName()
-                        + "."
-                        + callSentence.getMethod().getName()
-                        + "("
-                        + buildArgs(callSentence)
-                        + ");");
-
+        for (J2xElement element : method.getBody().getElements()) {
+            String line = element(element);
+            if (line != null) {
+                line(line);
             }
         }
 
@@ -109,17 +111,61 @@ public class CsWritter {
         line("}");
     }
 
-    private static boolean isSuperCall(J2xSentence sentence) {
-        if (sentence instanceof J2xMethodCallSentence) {
-            J2xMethodCallSentence callSentence = (J2xMethodCallSentence) sentence;
+    private static String element(J2xElement element) {
+        if (element instanceof J2xMethodCall) {
+            return methodCallElement((J2xMethodCall) element);
+        } else if (element instanceof J2xConstant) {
+            return literalElement((J2xConstant) element);
+        } else if (element instanceof J2xVariable) {
+            return variableElement((J2xVariable) element);
+        } else {
+            throw new IllegalArgumentException();
+        }
+    }
+
+    private static String methodCallElement(J2xMethodCall element) {
+        if (!isSuperCall(element)) {
+            return (element.getTarget().getName()
+                    + "."
+                    + element.getMethod().getName()
+                    + "("
+                    + buildArgs(element)
+                    + ");");
+        } else {
+            return null;
+        }
+    }
+
+    private static String literalElement(J2xConstant element) {
+        return "" + element.getValue();
+    }
+
+    private static String variableElement(J2xVariable element) {
+        return element.getName();
+    }
+
+    private static J2xMethodCall getSuperCall(J2xBlock block) {
+        if (block.getElements().isEmpty()) {
+            return null;
+        } else {
+            J2xElement element = block.getElements().get(0);
+            return isSuperCall(element)
+                    ? (J2xMethodCall) element
+                    : null;
+        }
+    }
+
+    private static boolean isSuperCall(J2xElement element) {
+        if (element instanceof J2xMethodCall) {
+            J2xMethodCall callSentence = (J2xMethodCall) element;
             return callSentence.getMethod().isConstructor();
         } else {
             return false;
         }
     }
 
-    private static String buildArgs(J2xMethodCallSentence callSentence) {
-        return Joiner.on(',').join(callSentence.getArgs());
+    private static String buildArgs(J2xMethodCall callSentence) {
+        return Joiner.on(',').join(Iterables.transform(callSentence.getArgs(), CsWritter::element));
     }
 
     private static String variable(J2xVariable variable) {

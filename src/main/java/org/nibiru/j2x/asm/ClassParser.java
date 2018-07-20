@@ -12,8 +12,9 @@ import org.nibiru.j2x.ast.J2xClass;
 import org.nibiru.j2x.ast.J2xField;
 import org.nibiru.j2x.ast.J2xMethod;
 import org.nibiru.j2x.ast.element.J2xConstant;
+import org.nibiru.j2x.ast.element.J2xElement;
 import org.nibiru.j2x.ast.element.J2xVariable;
-import org.nibiru.j2x.ast.sentence.J2xMethodCallSentence;
+import org.nibiru.j2x.ast.element.J2xMethodCall;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
@@ -130,7 +131,7 @@ public class ClassParser extends ClassVisitor {
         String packageName = name.substring(0, pos).replaceAll("/", ".");
         j2xClass = new J2xClass(name.substring(pos + 1),
                 packageName,
-                generatedClasses.get(superName),
+                parseClassPath(superName, generatedClasses),
                 access(access));
         generatedClasses.put(name, j2xClass);
     }
@@ -220,6 +221,7 @@ public class ClassParser extends ClassVisitor {
         private final String signature;
         private final String[] exceptions;
 
+        private final List<J2xVariable> variables;
         private final List<J2xVariable> arguments;
         private final J2xBlock body;
 
@@ -238,6 +240,7 @@ public class ClassParser extends ClassVisitor {
             this.signature = signature;
             this.exceptions = exceptions;
 
+            variables = Lists.newLinkedList();
             arguments = Lists.newArrayList();
             body = new J2xBlock();
 
@@ -245,26 +248,26 @@ public class ClassParser extends ClassVisitor {
             argCount = argCount(desc);
         }
 
+        @Override
         public void visitLocalVariable(String name,
                                        String desc,
                                        String signature,
                                        Label start,
                                        Label end,
                                        int index) {
-            if (!name.equals("this")) {
-                J2xVariable variable = new J2xVariable(name, parseDesc(desc));
-                if (argCount > 0) {
-                    argCount--;
-                    arguments.add(variable);
-                } else {
-                    body.getVariables().add(variable);
-                }
+            J2xVariable variable = variables.remove(0);
+            variable.setName(name);
+            variable.setType(parseDesc(desc));
+            if (argCount > 0 && !variable.isThis()) {
+                argCount--;
+                arguments.add(variable);
+            } else {
+                body.getVariables().add(variable);
             }
         }
 
         @Override
         public void visitFrame(int type, int nLocal, Object[] local, int nStack, Object[] stack) {
-            System.out.print("");
             super.visitFrame(type, nLocal, local, nStack, stack);
         }
 
@@ -278,6 +281,12 @@ public class ClassParser extends ClassVisitor {
                     break;
                 case Opcodes.ICONST_1:
                     stack.push(new J2xConstant(1));
+                    break;
+                case Opcodes.ICONST_2:
+                    stack.push(new J2xConstant(2));
+                    break;
+                case Opcodes.ICONST_3:
+                    stack.push(new J2xConstant(3));
                     break;
             }
         }
@@ -293,11 +302,10 @@ public class ClassParser extends ClassVisitor {
 
         @Override
         public void visitVarInsn(int opcode, int var) {
+            J2xVariable variable = addVariable(var);
             switch (opcode) {
                 case Opcodes.ALOAD:
-                    stack.push(new J2xVariable(var == 0
-                            ? "this"
-                            : "_" + var, J2xClass.OBJECT));
+                    stack.push(variable);
                     break;
                 case Opcodes.ISTORE:
                     break;
@@ -321,9 +329,14 @@ public class ClassParser extends ClassVisitor {
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
             switch (opcode) {
                 case Opcodes.INVOKESPECIAL:
-                    body.getSentences().add(new J2xMethodCallSentence(stack.pop(),
+                    List<J2xElement> args = Lists.newArrayList();
+                    for (Object dummy : new DescIterable(desc.substring(desc.indexOf("(") + 1, desc.indexOf(")")))) {
+                        args.add(stack.pop());
+                    }
+                    J2xVariable target = stack.pop();
+                    body.getElements().add(new J2xMethodCall(target,
                             parseClassPath(owner, generatedClasses).findMethod(name, desc),
-                            ImmutableList.of())); // TODO: parsear desc y sacar elementos del stack
+                            args));
                     break;
             }
         }
@@ -345,6 +358,7 @@ public class ClassParser extends ClassVisitor {
 
         @Override
         public void visitLdcInsn(Object cst) {
+            System.out.print("");
         }
 
         @Override
@@ -409,16 +423,25 @@ public class ClassParser extends ClassVisitor {
             j2xClass.getMethods().add(method);
         }
 
-        private int argCount(String desc) {
-            return Iterables.size(new DescIterable(argTypes(desc)));
+        private J2xVariable addVariable(int var) {
+            J2xVariable variable = new J2xVariable();
+            while (variables.size() <= var) {
+                variables.add(null);
+            }
+            variables.set(var, variable);
+            return variable;
         }
+    }
 
-        private String argTypes(String desc) {
-            return desc.substring(1, desc.indexOf(')'));
-        }
+    private static int argCount(String desc) {
+        return Iterables.size(new DescIterable(argTypes(desc)));
+    }
 
-        private String returnType(String desc) {
-            return desc.substring(desc.indexOf(')') + 1);
-        }
+    private static String argTypes(String desc) {
+        return desc.substring(1, desc.indexOf(')'));
+    }
+
+    private String returnType(String desc) {
+        return desc.substring(desc.indexOf(')') + 1);
     }
 }

@@ -4,14 +4,17 @@ import com.google.common.base.Preconditions;
 
 import java.util.Date;
 
-public class Hola {
-//    public Hola() {
-//        int x = 2;
-//    }
+public class Hola extends BaseClase {
+    public Hola() {
+        super(3);
+//        pepe = 2;
+//        String caca ="pablo";
+//        caca.toString();
+    }
     //    final String saludo = "hola";
 //    public int kkck = 123;
 //    public String[] otro;
-    //public Date[][] fechas;
+//    public Date[][] fechas;
 //    boolean zxing;
 //
 //    public void simple() {
