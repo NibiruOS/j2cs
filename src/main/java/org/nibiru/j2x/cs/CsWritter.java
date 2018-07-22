@@ -142,7 +142,19 @@ public class CsWritter {
     }
 
     private static String literalElement(J2xLiteral element) {
-        return "" + element.getValue();
+        if (element.getValue() == null) {
+            return "null";
+        } else if (element.getValue() instanceof Integer) {
+            return String.valueOf(element.getValue());
+        } else if (element.getValue() instanceof Float) {
+            return element.getValue() + "f";
+        } else if (element.getValue() instanceof Double) {
+            return element.getValue() + "d";
+        } else if (element.getValue() instanceof String) {
+            return "\"" + element.getValue() + "\"";
+        } else {
+            throw new IllegalArgumentException("Value not supported (yet): " + element.getValue().getClass());
+        }
     }
 
     private static String variableElement(J2xVariable element) {

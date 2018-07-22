@@ -4,17 +4,18 @@ import com.google.common.base.Preconditions;
 
 import java.util.Date;
 
-public class Hola extends BaseClase {
+public class Hola {
     public Hola() {
-        super(300);
-        int pepe =789;
+        //super(456);
+        String toto ="123";
+       // toto.toUpperCase();
 //        String caca ="pablo";
 //        caca.toString();
     }
 
-    private static int numero() {
-        return 2;
-    }
+    //    private static int numero() {
+    //        return 789;
+    //    }
     //    final String saludo = "hola";
 //    public int kkck = 123;
 //    public String[] otro;

@@ -2,10 +2,11 @@ package org.nibiru.j2x.asm;
 
 import com.google.common.collect.Lists;
 
-import java.util.Deque;
+import java.util.Collection;
+import java.util.LinkedList;
 
 class Stack {
-    private final Deque<Object> stack;
+    private final LinkedList<Object> stack;
 
     Stack() {
         stack = Lists.newLinkedList();
@@ -19,4 +20,8 @@ class Stack {
         return (T) stack.pop();
     }
 
+    public Collection<Object> asCollection() {
+        // TODO: totalmente ineficiente, podrian mantenerse 2 listas donde se pushee/popee al reves
+        return Lists.reverse(stack);
+    }
 }

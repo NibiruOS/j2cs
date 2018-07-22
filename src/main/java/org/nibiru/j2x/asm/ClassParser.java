@@ -1,5 +1,6 @@
 package org.nibiru.j2x.asm;
 
+import com.google.common.collect.Collections2;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -277,28 +278,18 @@ public class ClassParser extends ClassVisitor {
                 case Opcodes.LNEG:
                     break;
                 case Opcodes.ICONST_0:
-                    stack.push(new J2xLiteral(0));
-                    break;
                 case Opcodes.ICONST_1:
-                    stack.push(new J2xLiteral(1));
-                    break;
                 case Opcodes.ICONST_2:
-                    stack.push(new J2xLiteral(2));
-                    break;
                 case Opcodes.ICONST_3:
-                    stack.push(new J2xLiteral(3));
-                    break;
                 case Opcodes.ICONST_4:
-                    stack.push(new J2xLiteral(4));
-                    break;
                 case Opcodes.ICONST_5:
-                    stack.push(new J2xLiteral(5));
+                    stack.push(new J2xLiteral(opcode - Opcodes.ICONST_0));
                     break;
                 case Opcodes.IRETURN:
-                    body.getElements().add(new J2xReturn(stack.pop()));
+                    stack.push(new J2xReturn(stack.pop()));
                     break;
                 case Opcodes.RETURN:
-                    body.getElements().add(new J2xReturn());
+                    stack.push(new J2xReturn());
                     break;
             }
         }
@@ -307,8 +298,13 @@ public class ClassParser extends ClassVisitor {
         public void visitIntInsn(int opcode, int operand) {
             switch (opcode) {
                 case Opcodes.ALOAD:
-                case Opcodes.SIPUSH:
                     stack.push(new J2xLiteral(operand));
+                    break;
+                case Opcodes.BIPUSH:
+                    stack.push(new J2xLiteral((byte) operand));
+                    break;
+                case Opcodes.SIPUSH:
+                    stack.push(new J2xLiteral((short) operand));
                     break;
             }
         }
@@ -321,7 +317,12 @@ public class ClassParser extends ClassVisitor {
                     stack.push(variable);
                     break;
                 case Opcodes.ISTORE:
-                    body.getElements().add(new J2xAssignment(variable, stack.pop()));
+                case Opcodes.LSTORE:
+                case Opcodes.FSTORE:
+                case Opcodes.DSTORE:
+                case Opcodes.ASTORE:
+                    // TODO: deberia usar el opcode para determinar el tipo de la variable? esa info la tengo despues en visitLocalVariable (no sé si eso no es info de debug - estara siempre disponible?)
+                    stack.push(new J2xAssignment(variable, stack.pop()));
                     break;
             }
         }
@@ -342,13 +343,14 @@ public class ClassParser extends ClassVisitor {
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
             switch (opcode) {
+                case Opcodes.INVOKEVIRTUAL:
                 case Opcodes.INVOKESPECIAL:
                     List<Object> args = Lists.newArrayList();
                     for (Object dummy : new DescIterable(desc.substring(desc.indexOf("(") + 1, desc.indexOf(")")))) {
                         args.add(stack.pop());
                     }
                     J2xVariable target = stack.pop();
-                    body.getElements().add(new J2xMethodCall(target,
+                    stack.push(new J2xMethodCall(target,
                             parseClassPath(owner, generatedClasses).findMethod(name, desc),
                             args));
                     break;
@@ -372,7 +374,7 @@ public class ClassParser extends ClassVisitor {
 
         @Override
         public void visitLdcInsn(Object cst) {
-            System.out.print("");
+            stack.push(new J2xLiteral(cst));
         }
 
         @Override
@@ -426,6 +428,7 @@ public class ClassParser extends ClassVisitor {
 
         @Override
         public void visitEnd() {
+            body.getElements().addAll(stack.asCollection());
             J2xMethod method = new J2xMethod(name,
                     parseDesc(returnType(desc)),
                     access(access),
