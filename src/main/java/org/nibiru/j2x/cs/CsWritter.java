@@ -141,24 +141,30 @@ public class CsWritter {
     }
 
     private static String literalElement(J2xLiteral element) {
-        if (element.getValue() == null) {
+        Object value = element.getValue();
+        if (value == null) {
             return "null";
-        } else if (element.getValue() instanceof Integer) {
-            return String.valueOf(element.getValue());
-        } else if (element.getValue() instanceof Long) {
-            return element.getValue() + "l";
-        } else if (element.getValue() instanceof Float) {
-            return element.getValue() + "f";
-        } else if (element.getValue() instanceof Double) {
-            return element.getValue() + "d";
-        } else if (element.getValue() instanceof String) {
-            String value = (String) element.getValue();
-            return "\"" + value.replaceAll("%", "%%") + "\"";
-        } else if (element.getValue() instanceof Type) {
-            Type value = (Type) element.getValue();
-            return "typeof(" + capitalize(value.getClassName()) + ")";
+        } else if (value instanceof Byte
+                || value instanceof Integer
+                || value instanceof Boolean) {
+            return String.valueOf(value);
+        } else if (value instanceof Long) {
+            return value + "l";
+        } else if (value instanceof Float) {
+            return value + "f";
+        } else if (value instanceof Double) {
+            return value + "d";
+        } else if (value instanceof Character) {
+            Character charValue = (Character) value;
+            return "'" + charValue.charValue() + "'";
+        } else if (value instanceof String) {
+            String stringValue = (String) value;
+            return "\"" + stringValue.replaceAll("%", "%%") + "\"";
+        } else if (value instanceof Type) {
+            Type typeValue = (Type) value;
+            return "typeof(" + capitalize(typeValue.getClassName()) + ")";
         } else {
-            throw new IllegalArgumentException("Literal value not supported (yet): " + element.getValue().getClass());
+            throw new IllegalArgumentException("Literal value not supported (yet): " + value.getClass());
         }
     }
 

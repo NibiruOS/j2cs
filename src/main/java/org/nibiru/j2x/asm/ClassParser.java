@@ -451,13 +451,28 @@ public class ClassParser extends ClassVisitor {
 
         @Override
         public void visitEnd() {
-            J2xClass returnType =parseDesc(returnType(desc));
+            J2xClass returnType = parseDesc(returnType(desc));
             if (mustParseContent()) {
                 body.getElements().addAll(stack.asCollection());
             } else {
-                body.getElements().add(J2xClass.VOID.equals(returnType)
-                ? new J2xReturn()
-                : new J2xReturn(new J2xLiteral(null)));
+                // Construyo un return por defecto para que compile
+                Object returnValue;
+                if (J2xClass.VOID.equals(returnType)) {
+                    returnValue = new J2xReturn();
+                } else if (J2xClass.BOOL.equals(returnType)) {
+                    returnValue = new J2xReturn(new J2xLiteral(false));
+                } else if (J2xClass.BYTE.equals(returnType)
+                        || J2xClass.CHAR.equals(returnType)
+                        || J2xClass.DOUBLE.equals(returnType)
+                        || J2xClass.FLOAT.equals(returnType)
+                        || J2xClass.INT.equals(returnType)
+                        || J2xClass.LONG.equals(returnType)
+                        || J2xClass.SHORT.equals(returnType)) {
+                    returnValue = new J2xReturn(new J2xLiteral(0));
+                } else {
+                    returnValue = new J2xReturn(new J2xLiteral(null));
+                }
+                body.getElements().add(returnValue);
             }
 
 
