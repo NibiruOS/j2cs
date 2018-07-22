@@ -1,9 +1,5 @@
 package org.nibiru.j2x.borrame;
 
-import com.google.common.base.Preconditions;
-
-import java.util.Date;
-
 public class Hola {
     public Hola() {
         //super(456);

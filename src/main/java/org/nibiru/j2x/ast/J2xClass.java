@@ -36,7 +36,7 @@ public class J2xClass {
         return clazz;
     }
 
-    public static final J2xClass STRING = new J2xClass("String", JAVA_LANG_PACKAGE);
+//    public static final J2xClass STRING = new J2xClass("String", JAVA_LANG_PACKAGE);
 
     private final String name;
     private final String packageName;

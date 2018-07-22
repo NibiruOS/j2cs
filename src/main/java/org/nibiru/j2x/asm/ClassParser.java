@@ -1,6 +1,5 @@
 package org.nibiru.j2x.asm;
 
-import com.google.common.collect.Collections2;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -13,9 +12,9 @@ import org.nibiru.j2x.ast.J2xField;
 import org.nibiru.j2x.ast.J2xMethod;
 import org.nibiru.j2x.ast.element.J2xAssignment;
 import org.nibiru.j2x.ast.element.J2xLiteral;
+import org.nibiru.j2x.ast.element.J2xMethodCall;
 import org.nibiru.j2x.ast.element.J2xReturn;
 import org.nibiru.j2x.ast.element.J2xVariable;
-import org.nibiru.j2x.ast.element.J2xMethodCall;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
@@ -52,15 +51,21 @@ public class ClassParser extends ClassVisitor {
         }
     }
 
-    public static Map<String, J2xClass> parse(String classPath) {
+    public static Map<String, J2xClass> parse(String classPath,
+                                              ParsePolicy parsePolicy) {
         Map<String, J2xClass> generatedClasses = Maps.newHashMap();
 
-        parseClassPath(classPath, generatedClasses);
+        parseClassPath(classPath, generatedClasses, parsePolicy);
 
         return generatedClasses;
     }
 
-    private static J2xClass parseClassPath(String classPath, Map<String, J2xClass> generatedClasses) {
+    private static J2xClass parseClassPath(String classPath,
+                                           Map<String, J2xClass> generatedClasses,
+                                           ParsePolicy parsePolicy) {
+        if (classPath == null) {
+            return null;
+        }
         J2xClass systemClass = systemClasses.get(classPath);
         if (systemClass != null) {
             return systemClass;
@@ -72,12 +77,13 @@ public class ClassParser extends ClassVisitor {
         int dimensions = extractDimensions(classPath);
         if (dimensions > 0) {
             String itemClassPath = extractName(classPath);
-            J2xArray array = new J2xArray(parseClassPath(itemClassPath, generatedClasses),
+            J2xArray array = new J2xArray(parseClassPath(itemClassPath, generatedClasses, parsePolicy),
                     dimensions);
-            systemClasses.put(classPath, array);
+//            systemClasses.put(classPath, array);
             return array;
         } else {
-            return new ClassParser(generatedClasses).parseInternal(classPath);
+            return new ClassParser(generatedClasses, parsePolicy)
+                    .parseInternal(classPath);
         }
     }
 
@@ -99,15 +105,22 @@ public class ClassParser extends ClassVisitor {
     }
 
     private final Map<String, J2xClass> generatedClasses;
+    private final ParsePolicy parsePolicy;
     private J2xClass j2xClass;
 
-    private ClassParser(Map<String, J2xClass> generatedClasses) {
+    private ClassParser(Map<String, J2xClass> generatedClasses,
+                        ParsePolicy parsePolicy) {
         super(Opcodes.ASM5);
         this.generatedClasses = generatedClasses;
+        this.parsePolicy = parsePolicy;
+    }
+
+    private J2xClass parseClassPath(String path) {
+        return parseClassPath(path, generatedClasses, parsePolicy);
     }
 
     private J2xClass parseDesc(String desc) {
-        return parseClassPath(descToPath(desc), generatedClasses);
+        return parseClassPath(descToPath(desc));
     }
 
     private J2xClass parseInternal(String classPath) {
@@ -132,7 +145,7 @@ public class ClassParser extends ClassVisitor {
         String packageName = name.substring(0, pos).replaceAll("/", ".");
         j2xClass = new J2xClass(name.substring(pos + 1),
                 packageName,
-                parseClassPath(superName, generatedClasses),
+                parseClassPath(superName),
                 access(access));
         generatedClasses.put(name, j2xClass);
     }
@@ -262,7 +275,7 @@ public class ClassParser extends ClassVisitor {
             if (argCount > 0 && !variable.isThis()) {
                 argCount--;
                 arguments.add(variable);
-            } else {
+            } else if (mustParseContent()) {
                 body.getVariables().add(variable);
             }
         }
@@ -274,56 +287,62 @@ public class ClassParser extends ClassVisitor {
 
         @Override
         public void visitInsn(int opcode) {
-            switch (opcode) {
-                case Opcodes.LNEG:
-                    break;
-                case Opcodes.ICONST_0:
-                case Opcodes.ICONST_1:
-                case Opcodes.ICONST_2:
-                case Opcodes.ICONST_3:
-                case Opcodes.ICONST_4:
-                case Opcodes.ICONST_5:
-                    stack.push(new J2xLiteral(opcode - Opcodes.ICONST_0));
-                    break;
-                case Opcodes.IRETURN:
-                    stack.push(new J2xReturn(stack.pop()));
-                    break;
-                case Opcodes.RETURN:
-                    stack.push(new J2xReturn());
-                    break;
+            if (mustParseContent()) {
+                switch (opcode) {
+                    case Opcodes.LNEG:
+                        break;
+                    case Opcodes.ICONST_0:
+                    case Opcodes.ICONST_1:
+                    case Opcodes.ICONST_2:
+                    case Opcodes.ICONST_3:
+                    case Opcodes.ICONST_4:
+                    case Opcodes.ICONST_5:
+                        stack.push(new J2xLiteral(opcode - Opcodes.ICONST_0));
+                        break;
+                    case Opcodes.IRETURN:
+                        stack.push(new J2xReturn(stack.pop()));
+                        break;
+                    case Opcodes.RETURN:
+                        stack.push(new J2xReturn());
+                        break;
+                }
             }
         }
 
         @Override
         public void visitIntInsn(int opcode, int operand) {
-            switch (opcode) {
-                case Opcodes.ALOAD:
-                    stack.push(new J2xLiteral(operand));
-                    break;
-                case Opcodes.BIPUSH:
-                    stack.push(new J2xLiteral((byte) operand));
-                    break;
-                case Opcodes.SIPUSH:
-                    stack.push(new J2xLiteral((short) operand));
-                    break;
+            if (mustParseContent()) {
+                switch (opcode) {
+                    case Opcodes.ALOAD:
+                        stack.push(new J2xLiteral(operand));
+                        break;
+                    case Opcodes.BIPUSH:
+                        stack.push(new J2xLiteral((byte) operand));
+                        break;
+                    case Opcodes.SIPUSH:
+                        stack.push(new J2xLiteral((short) operand));
+                        break;
+                }
             }
         }
 
         @Override
         public void visitVarInsn(int opcode, int var) {
             J2xVariable variable = addVariable(var);
-            switch (opcode) {
-                case Opcodes.ALOAD:
-                    stack.push(variable);
-                    break;
-                case Opcodes.ISTORE:
-                case Opcodes.LSTORE:
-                case Opcodes.FSTORE:
-                case Opcodes.DSTORE:
-                case Opcodes.ASTORE:
-                    // TODO: deberia usar el opcode para determinar el tipo de la variable? esa info la tengo despues en visitLocalVariable (no sé si eso no es info de debug - estara siempre disponible?)
-                    stack.push(new J2xAssignment(variable, stack.pop()));
-                    break;
+            if (mustParseContent()) {
+                switch (opcode) {
+                    case Opcodes.ALOAD:
+                        stack.push(variable);
+                        break;
+                    case Opcodes.ISTORE:
+                    case Opcodes.LSTORE:
+                    case Opcodes.FSTORE:
+                    case Opcodes.DSTORE:
+                    case Opcodes.ASTORE:
+                        // TODO: deberia usar el opcode para determinar el tipo de la variable? esa info la tengo despues en visitLocalVariable (no sé si eso no es info de debug - estara siempre disponible?)
+                        stack.push(new J2xAssignment(variable, stack.pop()));
+                        break;
+                }
             }
         }
 
@@ -342,18 +361,20 @@ public class ClassParser extends ClassVisitor {
 
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
-            switch (opcode) {
-                case Opcodes.INVOKEVIRTUAL:
-                case Opcodes.INVOKESPECIAL:
-                    List<Object> args = Lists.newArrayList();
-                    for (Object dummy : new DescIterable(desc.substring(desc.indexOf("(") + 1, desc.indexOf(")")))) {
-                        args.add(stack.pop());
-                    }
-                    J2xVariable target = stack.pop();
-                    stack.push(new J2xMethodCall(target,
-                            parseClassPath(owner, generatedClasses).findMethod(name, desc),
-                            args));
-                    break;
+            if (mustParseContent()) {
+                switch (opcode) {
+                    case Opcodes.INVOKEVIRTUAL:
+                    case Opcodes.INVOKESPECIAL:
+                        List<Object> args = Lists.newArrayList();
+                        for (Object dummy : new DescIterable(argTypes(desc))) {
+                            args.add(stack.pop());
+                        }
+                        J2xVariable target = stack.pop();
+                        stack.push(new J2xMethodCall(target,
+                                parseClassPath(owner).findMethod(name, desc),
+                                args));
+                        break;
+                }
             }
         }
 
@@ -374,7 +395,9 @@ public class ClassParser extends ClassVisitor {
 
         @Override
         public void visitLdcInsn(Object cst) {
-            stack.push(new J2xLiteral(cst));
+            if (mustParseContent()) {
+                stack.push(new J2xLiteral(cst));
+            }
         }
 
         @Override
@@ -428,9 +451,18 @@ public class ClassParser extends ClassVisitor {
 
         @Override
         public void visitEnd() {
-            body.getElements().addAll(stack.asCollection());
+            J2xClass returnType =parseDesc(returnType(desc));
+            if (mustParseContent()) {
+                body.getElements().addAll(stack.asCollection());
+            } else {
+                body.getElements().add(J2xClass.VOID.equals(returnType)
+                ? new J2xReturn()
+                : new J2xReturn(new J2xLiteral(null)));
+            }
+
+
             J2xMethod method = new J2xMethod(name,
-                    parseDesc(returnType(desc)),
+                    returnType,
                     access(access),
                     isStatic(access),
                     isFinal(access),
@@ -448,6 +480,10 @@ public class ClassParser extends ClassVisitor {
             variables.set(var, variable);
             return variable;
         }
+    }
+
+    private boolean mustParseContent() {
+        return parsePolicy.mustParseContent(j2xClass.getFullName());
     }
 
     private static int argCount(String desc) {

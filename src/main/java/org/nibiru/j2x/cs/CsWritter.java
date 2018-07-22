@@ -16,9 +16,10 @@ import org.nibiru.j2x.ast.J2xMember;
 import org.nibiru.j2x.ast.J2xMethod;
 import org.nibiru.j2x.ast.element.J2xAssignment;
 import org.nibiru.j2x.ast.element.J2xLiteral;
+import org.nibiru.j2x.ast.element.J2xMethodCall;
 import org.nibiru.j2x.ast.element.J2xReturn;
 import org.nibiru.j2x.ast.element.J2xVariable;
-import org.nibiru.j2x.ast.element.J2xMethodCall;
+import org.objectweb.asm.Type;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -75,8 +76,6 @@ public class CsWritter {
     }
 
     private void write(J2xClass j2xClass, J2xMethod method) {
-
-
         J2xMethodCall superCall = getSuperCall(method.getBody());
 
         line("%s%s%s(%s) %s {",
@@ -146,14 +145,20 @@ public class CsWritter {
             return "null";
         } else if (element.getValue() instanceof Integer) {
             return String.valueOf(element.getValue());
+        } else if (element.getValue() instanceof Long) {
+            return element.getValue() + "l";
         } else if (element.getValue() instanceof Float) {
             return element.getValue() + "f";
         } else if (element.getValue() instanceof Double) {
             return element.getValue() + "d";
         } else if (element.getValue() instanceof String) {
-            return "\"" + element.getValue() + "\"";
+            String value = (String) element.getValue();
+            return "\"" + value.replaceAll("%", "%%") + "\"";
+        } else if (element.getValue() instanceof Type) {
+            Type value = (Type) element.getValue();
+            return "typeof(" + capitalize(value.getClassName()) + ")";
         } else {
-            throw new IllegalArgumentException("Value not supported (yet): " + element.getValue().getClass());
+            throw new IllegalArgumentException("Literal value not supported (yet): " + element.getValue().getClass());
         }
     }
 
@@ -241,7 +246,7 @@ public class CsWritter {
     private void write(String format, Object... args) {
         try {
             out.append(String.format(format, args));
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
