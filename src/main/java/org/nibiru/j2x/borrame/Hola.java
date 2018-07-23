@@ -10,9 +10,16 @@ public class Hola {
 //        caca.toString();
     }
 
-    //    private static int numero() {
-    //        return 789;
-    //    }
+    private static int numero(int a) {
+        return 789;
+    }
+
+    private static int numero(int a, int b) {
+        return 666;
+    }
+//    private static int numero(int a, int b) {
+//        return 666;
+//    }
     //    final String saludo = "hola";
 //    public int kkck = 123;
 //    public String[] otro;

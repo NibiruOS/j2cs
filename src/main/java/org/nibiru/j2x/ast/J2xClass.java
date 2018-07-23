@@ -1,5 +1,6 @@
 package org.nibiru.j2x.ast;
 
+import com.google.common.base.Objects;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
@@ -120,5 +121,19 @@ public class J2xClass {
             }
         }
         return null;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        J2xClass j2xClass = (J2xClass) o;
+        return Objects.equal(name, j2xClass.name) &&
+                Objects.equal(packageName, j2xClass.packageName);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(name, packageName);
     }
 }

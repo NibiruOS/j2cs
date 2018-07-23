@@ -1,8 +1,10 @@
 package org.nibiru.j2x.ast;
 
+import com.google.common.base.Objects;
+
 import static com.google.common.base.Preconditions.checkNotNull;
 
-public class J2xMember {
+public abstract class J2xMember {
 
     private final String name;
     private final J2xClass type;
@@ -40,5 +42,22 @@ public class J2xMember {
 
     public boolean isFinal() {
         return isFinal;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        J2xMember j2xMember = (J2xMember) o;
+        return isStatic == j2xMember.isStatic &&
+                isFinal == j2xMember.isFinal &&
+                Objects.equal(name, j2xMember.name) &&
+                Objects.equal(type, j2xMember.type) &&
+                access == j2xMember.access;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(name, type, access, isStatic, isFinal);
     }
 }

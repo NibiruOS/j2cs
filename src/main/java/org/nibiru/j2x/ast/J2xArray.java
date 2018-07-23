@@ -1,5 +1,6 @@
 package org.nibiru.j2x.ast;
 
+import com.google.common.base.Objects;
 import com.google.common.base.Strings;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -24,5 +25,20 @@ public class J2xArray extends J2xClass {
 
     public int getDimensions() {
         return dimensions;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        if (!super.equals(o)) return false;
+        J2xArray array = (J2xArray) o;
+        return dimensions == array.dimensions &&
+                Objects.equal(itemClass, array.itemClass);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(super.hashCode(), itemClass, dimensions);
     }
 }

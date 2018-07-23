@@ -4,6 +4,7 @@ import com.google.common.base.CaseFormat;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 
@@ -31,7 +32,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 public class CsWritter {
     private static final Map<String, String> PREDEFINED_TYPES =
-            ImmutableMap.of(Object.class.getName(), "object");
+            ImmutableMap.of(Object.class.getName(), "object",
+                    "string", "string");
     private final Writer out;
     private final boolean pretty;
     private int indentation;
@@ -43,6 +45,10 @@ public class CsWritter {
 
     public void write(J2xClass j2xClass) {
         try {
+            if (j2xClass.getFullName().equals(String.class.getName())) {
+                updateStringClass(j2xClass);
+            }
+
             line("namespace %s {", capitalize(j2xClass.getPackageName()));
             indentation++;
             line("%sclass %s%s {", access(j2xClass.getAccess()),
@@ -144,6 +150,7 @@ public class CsWritter {
         if (value == null) {
             return "null";
         } else if (value instanceof Byte
+                || value instanceof Short
                 || value instanceof Integer
                 || value instanceof Boolean) {
             return String.valueOf(value);
@@ -158,7 +165,7 @@ public class CsWritter {
             return "'" + charValue.charValue() + "'";
         } else if (value instanceof String) {
             String stringValue = (String) value;
-            return "\"" + stringValue.replaceAll("%", "%%") + "\"";
+            return "Java.Lang.String.FromNative(\"" + stringValue.replaceAll("%", "%%") + "\")";
         } else if (value instanceof Type) {
             Type typeValue = (Type) value;
             return "typeof(" + capitalize(typeValue.getClassName()) + ")";
@@ -203,7 +210,9 @@ public class CsWritter {
     }
 
     private static String buildArgs(J2xMethodCall callSentence) {
-        return Joiner.on(',').join(Iterables.transform(callSentence.getArgs(), CsWritter::element));
+        return Joiner.on(',')
+                .join(Iterables.transform(callSentence.getArgs(),
+                        CsWritter::element));
     }
 
     private static String variable(J2xVariable variable) {
@@ -224,18 +233,24 @@ public class CsWritter {
     }
 
     private static String access(J2xAccess access) {
-        if (access == J2xAccess.PUBLIC) {
-            return "public ";
-        } else {
-            return "";
-        }
+        return access == J2xAccess.PUBLIC
+                ? "public "
+                : "";
     }
 
-    private static String modifiers(J2xMember member) {
-        return String.format("%s%s%s",
-                access(member.getAccess()),
-                member.isStatic() ? "static " : "",
-                member.isFinal() ? "readonly " : "");
+    private static String modifiers(J2xMethod method) {
+        return commonModifiers(method);
+        // + (method.isFinal() ? "sealed " : ""); // TODO: habria que ver todo el tema del virttual y todo eso. Por defecto es sealed, por lo que solo hay que especificalro si se está sobreescribiendo un método virtual.
+    }
+
+    private static String modifiers(J2xField field) {
+        return commonModifiers(field)
+                + (field.isFinal() ? "readonly " : "");
+    }
+
+    private static String commonModifiers(J2xMember member) {
+        return access(member.getAccess())
+                + (member.isStatic() ? "static " : "");
     }
 
     private void startLine() {
@@ -276,5 +291,21 @@ public class CsWritter {
         return Joiner.on('.')
                 .join(Iterables.transform(Splitter.on('.')
                         .split(packageName), CaseFormat.LOWER_CAMEL.converterTo(CaseFormat.UPPER_CAMEL)));
+    }
+
+    private static void updateStringClass(J2xClass j2xClass) {
+        J2xBlock body = new J2xBlock();
+        body.getElements()
+                .add(new J2xReturn(new J2xLiteral(null)));
+
+        j2xClass.getMethods()
+                .add(new J2xMethod("FromNative",
+                        j2xClass,
+                        J2xAccess.PUBLIC,
+                        true,
+                        true,
+                        "()V",
+                        ImmutableList.of(new J2xVariable("value", new J2xClass("string", "", null, J2xAccess.PUBLIC))),
+                        body));
     }
 }

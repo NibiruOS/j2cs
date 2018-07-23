@@ -269,7 +269,9 @@ public class ClassParser extends ClassVisitor {
                                        Label start,
                                        Label end,
                                        int index) {
-            J2xVariable variable = variables.remove(0);
+            J2xVariable variable = variables.isEmpty()
+                    ? new J2xVariable()
+                    : variables.remove(0);
             variable.setName(name);
             variable.setType(parseDesc(desc));
             if (argCount > 0 && !variable.isThis()) {
