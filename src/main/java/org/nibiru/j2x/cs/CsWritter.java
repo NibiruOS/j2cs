@@ -18,6 +18,7 @@ import org.nibiru.j2x.ast.J2xMethod;
 import org.nibiru.j2x.ast.element.J2xAssignment;
 import org.nibiru.j2x.ast.element.J2xLiteral;
 import org.nibiru.j2x.ast.element.J2xMethodCall;
+import org.nibiru.j2x.ast.element.J2xNativeCode;
 import org.nibiru.j2x.ast.element.J2xReturn;
 import org.nibiru.j2x.ast.element.J2xVariable;
 import org.objectweb.asm.Type;
@@ -49,13 +50,15 @@ public class CsWritter {
                 updateStringClass(j2xClass);
             }
 
-            line("namespace %s {", capitalize(j2xClass.getPackageName()));
+            line("namespace %s", capitalize(j2xClass.getPackageName()));
+            line("{");
             indentation++;
-            line("%sclass %s%s {", access(j2xClass.getAccess()),
+            line("%sclass %s%s", access(j2xClass.getAccess()),
                     j2xClass.getName(),
                     (j2xClass.getSuperClass() == null)
                             ? ""
                             : (" : " + capitalize(j2xClass.getSuperClass().getFullName())));
+            line("{");
             indentation++;
 
             for (J2xField field : j2xClass.getFields()) {
@@ -85,7 +88,7 @@ public class CsWritter {
     private void write(J2xClass j2xClass, J2xMethod method) {
         J2xMethodCall superCall = getSuperCall(method.getBody());
 
-        line("%s%s%s(%s) %s {",
+        line("%s%s%s(%s)",
                 modifiers(method),
                 method.isConstructor()
                         ? ""
@@ -99,7 +102,7 @@ public class CsWritter {
                 superCall != null
                         ? " : base(" + buildArgs(superCall) + ")"
                         : "");
-
+        line("{");
         indentation++;
         for (J2xVariable variable : method.getBody().getVariables()) {
             if (!variable.isThis()) {
@@ -129,6 +132,8 @@ public class CsWritter {
             return assignmentElement((J2xAssignment) element);
         } else if (element instanceof J2xReturn) {
             return returnElement((J2xReturn) element);
+        } else if (element instanceof J2xNativeCode) {
+            return nativeCodeElement((J2xNativeCode) element);
         } else {
             throw new IllegalArgumentException();
         }
@@ -189,6 +194,10 @@ public class CsWritter {
                 ? " " + element(element.getValue())
                 : "")
                 + ";";
+    }
+
+    private static String nativeCodeElement(J2xNativeCode element) {
+        return element.getCode();
     }
 
     private static J2xMethodCall getSuperCall(J2xBlock block) {

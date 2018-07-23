@@ -1,11 +1,13 @@
 package org.nibiru.j2x.borrame;
 
+import org.nibiru.j2x.ast.J2xNative;
+
 public class Hola {
     public Hola() {
         //super(456);
-        String toto ="123";
+        String toto = "123";
         toto.toUpperCase();
-       // toto.toUpperCase();
+        // toto.toUpperCase();
 //        String caca ="pablo";
 //        caca.toString();
     }
@@ -17,6 +19,11 @@ public class Hola {
     private static int numero(int a, int b) {
         return 666;
     }
+
+    @J2xNative(language = "C#",
+            value = "System.Console.WriteLine(\"Hola!\");" +
+            "\nreturn 5+1;")
+    public native int sumar(int valor); // TODO: no está reconociendo los parámetros en los métodos nativos
 //    private static int numero(int a, int b) {
 //        return 666;
 //    }
@@ -34,12 +41,12 @@ public class Hola {
 //    }
 //
 //    public void saludar() {
-        //boolean mal = true;
+    //boolean mal = true;
 //        if (mal) {
 //            return "Hola guampa";
 //        } else {
 //            return "Hola";
 //        }
-        //return "Hola";
+    //return "Hola";
 //    }
 }

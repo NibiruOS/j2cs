@@ -13,6 +13,7 @@ import org.nibiru.j2x.ast.J2xMethod;
 import org.nibiru.j2x.ast.element.J2xAssignment;
 import org.nibiru.j2x.ast.element.J2xLiteral;
 import org.nibiru.j2x.ast.element.J2xMethodCall;
+import org.nibiru.j2x.ast.element.J2xNativeCode;
 import org.nibiru.j2x.ast.element.J2xReturn;
 import org.nibiru.j2x.ast.element.J2xVariable;
 import org.objectweb.asm.AnnotationVisitor;
@@ -427,6 +428,50 @@ public class ClassParser extends ClassVisitor {
         @Override
         public AnnotationVisitor visitInsnAnnotation(int typeRef, TypePath typePath, String desc, boolean visible) {
             return super.visitInsnAnnotation(typeRef, typePath, desc, visible);
+        }
+
+        @Override
+        public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+            if (mustParseContent()) {
+                if (descToPath(desc).equals("org/nibiru/j2x/ast/J2xNative")) {
+                    return new AnnotationVisitor(Opcodes.ASM5) {
+                        String language;
+                        String code;
+
+                        @Override
+                        public void visit(String name, Object value) {
+                            if (name.equals("language")) {
+                                language = String.valueOf(value);
+                            } else if (name.equals("value")) {
+                                code = String.valueOf(value);
+                            }
+                        }
+
+                        @Override
+                        public void visitEnd() {
+                            body.getElements()
+                                    .add(new J2xNativeCode(language, code));
+                        }
+                    };
+                }
+            }
+            return super.visitAnnotation(desc, visible);
+        }
+
+        @Override
+        public AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String desc, boolean visible) {
+            if (mustParseContent()) {
+                System.out.print("");
+            }
+            return super.visitTypeAnnotation(typeRef, typePath, desc, visible);
+        }
+
+        @Override
+        public AnnotationVisitor visitParameterAnnotation(int parameter, String desc, boolean visible) {
+            if (mustParseContent()) {
+                System.out.print("");
+            }
+            return super.visitParameterAnnotation(parameter, desc, visible);
         }
 
         @Override
