@@ -53,7 +53,9 @@ public class CsWritter {
             indentation++;
             line("%sclass %s%s {", access(j2xClass.getAccess()),
                     j2xClass.getName(),
-                    (j2xClass.getSuperClass() == null || j2xClass.getSuperClass().equals(J2xClass.OBJECT)) ? "" : (" : " + capitalize(j2xClass.getSuperClass().getFullName())));
+                    (j2xClass.getSuperClass() == null)
+                            ? ""
+                            : (" : " + capitalize(j2xClass.getSuperClass().getFullName())));
             indentation++;
 
             for (J2xField field : j2xClass.getFields()) {

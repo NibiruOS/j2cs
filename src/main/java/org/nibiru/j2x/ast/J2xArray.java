@@ -10,10 +10,12 @@ public class J2xArray extends J2xClass {
     private final J2xClass itemClass;
     private final int dimensions;
 
-    public J2xArray(J2xClass itemClass, int dimensions) {
+    public J2xArray(J2xClass itemClass,
+                    int dimensions,
+                    J2xClass objectClass) {
         super(itemClass.getName() + Strings.repeat(ARRAY, dimensions),
                 JAVA_LANG_PACKAGE,
-                J2xClass.OBJECT,
+                objectClass,
                 J2xAccess.PUBLIC);
         this.itemClass = checkNotNull(itemClass);
         this.dimensions = dimensions;

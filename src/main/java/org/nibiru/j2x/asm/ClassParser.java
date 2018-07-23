@@ -77,9 +77,11 @@ public class ClassParser extends ClassVisitor {
         int dimensions = extractDimensions(classPath);
         if (dimensions > 0) {
             String itemClassPath = extractName(classPath);
-            J2xArray array = new J2xArray(parseClassPath(itemClassPath, generatedClasses, parsePolicy),
-                    dimensions);
-//            systemClasses.put(classPath, array);
+            J2xArray array = new J2xArray(parseClassPath(itemClassPath,
+                    generatedClasses,
+                    parsePolicy),
+                    dimensions,
+                    parseClassPath("java/lang/Object", generatedClasses, parsePolicy));
             return array;
         } else {
             return new ClassParser(generatedClasses, parsePolicy)
