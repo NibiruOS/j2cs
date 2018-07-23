@@ -4,6 +4,7 @@ public class Hola {
     public Hola() {
         //super(456);
         String toto ="123";
+        toto.toUpperCase();
        // toto.toUpperCase();
 //        String caca ="pablo";
 //        caca.toString();

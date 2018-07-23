@@ -328,7 +328,7 @@ public class ClassParser extends ClassVisitor {
 
         @Override
         public void visitVarInsn(int opcode, int var) {
-            J2xVariable variable = addVariable(var);
+            J2xVariable variable = variable(var);
             if (mustParseContent()) {
                 switch (opcode) {
                     case Opcodes.ALOAD:
@@ -455,26 +455,8 @@ public class ClassParser extends ClassVisitor {
             if (mustParseContent()) {
                 body.getElements().addAll(stack.asCollection());
             } else {
-                // Construyo un return por defecto para que compile
-                Object returnValue;
-                if (J2xClass.VOID.equals(returnType)) {
-                    returnValue = new J2xReturn();
-                } else if (J2xClass.BOOL.equals(returnType)) {
-                    returnValue = new J2xReturn(new J2xLiteral(false));
-                } else if (J2xClass.BYTE.equals(returnType)
-                        || J2xClass.CHAR.equals(returnType)
-                        || J2xClass.DOUBLE.equals(returnType)
-                        || J2xClass.FLOAT.equals(returnType)
-                        || J2xClass.INT.equals(returnType)
-                        || J2xClass.LONG.equals(returnType)
-                        || J2xClass.SHORT.equals(returnType)) {
-                    returnValue = new J2xReturn(new J2xLiteral(0));
-                } else {
-                    returnValue = new J2xReturn(new J2xLiteral(null));
-                }
-                body.getElements().add(returnValue);
+                body.getElements().add(buildEmptyReturn(returnType));
             }
-
 
             J2xMethod method = new J2xMethod(name,
                     returnType,
@@ -487,14 +469,39 @@ public class ClassParser extends ClassVisitor {
             j2xClass.getMethods().add(method);
         }
 
-        private J2xVariable addVariable(int var) {
-            J2xVariable variable = new J2xVariable();
+        private J2xVariable variable(int var) {
             while (variables.size() <= var) {
                 variables.add(null);
             }
-            variables.set(var, variable);
+            J2xVariable variable = variables.get(var);
+            if (variable == null) {
+                variable = new J2xVariable();
+                variables.set(var, variable);
+            }
             return variable;
         }
+    }
+
+    private static J2xReturn buildEmptyReturn(J2xClass returnType) {
+        J2xReturn returnValue;
+        if (J2xClass.VOID.equals(returnType)) {
+            returnValue = new J2xReturn();
+        } else if (J2xClass.BOOL.equals(returnType)) {
+            returnValue = new J2xReturn(new J2xLiteral(false));
+        } else if (J2xClass.CHAR.equals(returnType)) {
+            returnValue = new J2xReturn(new J2xLiteral(' '));
+        } else if (J2xClass.BYTE.equals(returnType)
+                || J2xClass.CHAR.equals(returnType)
+                || J2xClass.DOUBLE.equals(returnType)
+                || J2xClass.FLOAT.equals(returnType)
+                || J2xClass.INT.equals(returnType)
+                || J2xClass.LONG.equals(returnType)
+                || J2xClass.SHORT.equals(returnType)) {
+            returnValue = new J2xReturn(new J2xLiteral(0));
+        } else {
+            returnValue = new J2xReturn(new J2xLiteral(null));
+        }
+        return returnValue;
     }
 
     private boolean mustParseContent() {

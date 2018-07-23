@@ -6,6 +6,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 public class J2xMethod extends J2xMember {
     public final static String CONSTRUCTOR_NAME = "<init>";
+    public final static String STATIC_CONSTRUCTOR_NAME = "<clinit>";
     private final String argDesc;
     private final Iterable<J2xVariable> arguments;
     private final J2xBlock body;
@@ -37,6 +38,7 @@ public class J2xMethod extends J2xMember {
     }
 
     public boolean isConstructor() {
-        return CONSTRUCTOR_NAME.equals(getName());
+        return CONSTRUCTOR_NAME.equals(getName())
+                || STATIC_CONSTRUCTOR_NAME.equals(getName());
     }
 }

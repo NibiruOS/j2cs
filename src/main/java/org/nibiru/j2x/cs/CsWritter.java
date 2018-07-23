@@ -31,8 +31,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 public class CsWritter {
     private static final Map<String, String> PREDEFINED_TYPES =
-            ImmutableMap.of(Object.class.getName(), "object",
-                    String.class.getName(), "string");
+            ImmutableMap.of(Object.class.getName(), "object");
     private final Writer out;
     private final boolean pretty;
     private int indentation;
@@ -131,7 +130,7 @@ public class CsWritter {
         if (!isSuperCall(element)) {
             return (element.getTarget().getName()
                     + "."
-                    + element.getMethod().getName()
+                    + capitalize(element.getMethod().getName())
                     + "("
                     + buildArgs(element)
                     + ");");
