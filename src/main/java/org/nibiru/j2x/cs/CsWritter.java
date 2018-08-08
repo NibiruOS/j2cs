@@ -34,7 +34,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class CsWritter {
     private static final Map<String, String> PREDEFINED_TYPES =
             ImmutableMap.of(Object.class.getName(), "object",
-                    "string", "string");
+                    "string", "string",
+                    "boolean", "bool");
     private final Writer out;
     private final boolean pretty;
     private int indentation;
@@ -54,7 +55,7 @@ public class CsWritter {
             line("{");
             indentation++;
             line("%sclass %s%s", access(j2xClass.getAccess()),
-                    j2xClass.getName(),
+                    removeDollar(j2xClass.getName()),
                     (j2xClass.getSuperClass() == null)
                             ? ""
                             : (" : " + capitalize(j2xClass.getSuperClass().getFullName())));
@@ -82,13 +83,17 @@ public class CsWritter {
         line("%s%s %s;",
                 modifiers(field),
                 type(field.getType()),
-                field.getName());
+                removeDollar(field.getName()));
     }
 
     private void write(J2xClass j2xClass, J2xMethod method) {
         J2xMethodCall superCall = getSuperCall(method.getBody());
 
-        line("%s%s%s(%s)",
+        if (j2xClass.getName().equals("Hola") && superCall != null) {
+            System.out.print(22);
+        }
+
+        line("%s%s%s(%s)    %s",
                 modifiers(method),
                 method.isConstructor()
                         ? ""
@@ -106,7 +111,7 @@ public class CsWritter {
         indentation++;
         for (J2xVariable variable : method.getBody().getVariables()) {
             if (!variable.isThis()) {
-                line(type(variable.getType()) + " " + variable.getName() + ";");
+                line(type(variable.getType()) + " " + removeDollar(variable.getName()) + ";");
             }
         }
         for (Object element : method.getBody().getElements()) {
@@ -169,7 +174,7 @@ public class CsWritter {
             return value + "d";
         } else if (value instanceof Character) {
             Character charValue = (Character) value;
-            return "'" + charValue.charValue() + "'";
+            return "'" + charValue + "'";
         } else if (value instanceof String) {
             String stringValue = (String) value;
             return "Java.Lang.String.FromNative(\"" + stringValue.replaceAll("%", "%%") + "\")";
@@ -229,7 +234,7 @@ public class CsWritter {
     private static String variable(J2xVariable variable) {
         return String.format("%s %s",
                 type(variable.getType()),
-                variable.getName());
+                removeDollar(variable.getName()));
     }
 
     private static String type(J2xClass type) {
@@ -237,9 +242,9 @@ public class CsWritter {
             J2xArray arrayType = (J2xArray) type;
             return type(arrayType.getItemClass()) + Strings.repeat("[]", arrayType.getDimensions());
         } else {
-            return type.isPrimitive() ?
-                    type.getName()
-                    : PREDEFINED_TYPES.getOrDefault(type.getFullName(), capitalize(type.getFullName()));
+            return PREDEFINED_TYPES.getOrDefault(type.getFullName(), type.isPrimitive()
+                    ? type.getName()
+                    : capitalize(type.getFullName()));
         }
     }
 
@@ -298,10 +303,14 @@ public class CsWritter {
         endLine();
     }
 
-    private static String capitalize(String packageName) {
-        return Joiner.on('.')
+    private static String capitalize(String name) {
+        return removeDollar(Joiner.on('.')
                 .join(Iterables.transform(Splitter.on('.')
-                        .split(packageName), CaseFormat.LOWER_CAMEL.converterTo(CaseFormat.UPPER_CAMEL)));
+                        .split(name), CaseFormat.LOWER_CAMEL.converterTo(CaseFormat.UPPER_CAMEL))));
+    }
+
+    public static String removeDollar(String name) {
+        return name.replaceAll("\\$", "_");
     }
 
     private static void updateStringClass(J2xClass j2xClass) {

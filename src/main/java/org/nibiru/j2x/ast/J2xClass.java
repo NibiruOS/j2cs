@@ -14,7 +14,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class J2xClass {
     static String JAVA_LANG_PACKAGE = "java.lang";
     public static final J2xClass VOID = new J2xClass("void");
-    public static final J2xClass BOOL = new J2xClass("bool");
+    public static final J2xClass BOOLEAN = new J2xClass("boolean");
     public static final J2xClass CHAR = new J2xClass("char");
     public static final J2xClass BYTE = new J2xClass("byte");
     public static final J2xClass SHORT = new J2xClass("short");

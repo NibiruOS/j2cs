@@ -8,6 +8,8 @@ public class IgnoreSystemClassesPolicy implements ParsePolicy {
     @Override
     public boolean mustParseContent(@Nonnull String className) {
         checkNotNull(className);
-        return !className.startsWith("java.") && !className.startsWith("sun.");
+        return !className.startsWith("java.")
+                && !className.startsWith("javax.")
+                && !className.startsWith("sun.");
     }
 }

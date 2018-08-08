@@ -78,12 +78,11 @@ public class ClassParser extends ClassVisitor {
         int dimensions = extractDimensions(classPath);
         if (dimensions > 0) {
             String itemClassPath = extractName(classPath);
-            J2xArray array = new J2xArray(parseClassPath(itemClassPath,
+            return new J2xArray(parseClassPath(itemClassPath,
                     generatedClasses,
                     parsePolicy),
                     dimensions,
                     parseClassPath("java/lang/Object", generatedClasses, parsePolicy));
-            return array;
         } else {
             return new ClassParser(generatedClasses, parsePolicy)
                     .parseInternal(classPath);
@@ -173,7 +172,7 @@ public class ClassParser extends ClassVisitor {
                                      String desc,
                                      String signature,
                                      String[] exceptions) {
-        return new CsMethodVisitor(access,
+        return new MethodParser(access,
                 name,
                 desc,
                 signature,
@@ -208,7 +207,7 @@ public class ClassParser extends ClassVisitor {
                 case "V":
                     return "void";
                 case "Z":
-                    return "bool";
+                    return "boolean";
                 case "C":
                     return "char";
                 case "B":
@@ -231,7 +230,7 @@ public class ClassParser extends ClassVisitor {
     }
 
 
-    private class CsMethodVisitor extends MethodVisitor {
+    private class MethodParser extends MethodVisitor {
         private final int access;
         private final String name;
         private final String desc;
@@ -245,12 +244,15 @@ public class ClassParser extends ClassVisitor {
         private int argCount;
         private final Stack stack;
 
-        private CsMethodVisitor(int access,
-                                String name,
-                                String desc,
-                                String signature,
-                                String[] exceptions) {
+        private MethodParser(int access,
+                             String name,
+                             String desc,
+                             String signature,
+                             String[] exceptions) {
             super(Opcodes.ASM5);
+            if (j2xClass.getName().equals("Hola") && (access & Opcodes.ACC_NATIVE) != 0) {
+                System.out.print("matanga");
+            }
             this.access = access;
             this.name = name;
             this.desc = desc;
@@ -353,14 +355,18 @@ public class ClassParser extends ClassVisitor {
 
         @Override
         public void visitTypeInsn(int opcode, String type) {
-            super.visitTypeInsn(opcode, type);
+            if (mustParseContent()) {
+                super.visitTypeInsn(opcode, type);
+            }
         }
 
         @Override
         public void visitFieldInsn(int opcode, String owner, String name, String desc) {
-            switch (opcode) {
-                case Opcodes.INVOKESPECIAL:
-                    break;
+            if (mustParseContent()) {
+                switch (opcode) {
+                    case Opcodes.INVOKESPECIAL:
+                        break;
+                }
             }
         }
 
@@ -385,12 +391,16 @@ public class ClassParser extends ClassVisitor {
 
         @Override
         public void visitInvokeDynamicInsn(String name, String desc, Handle bsm, Object... bsmArgs) {
-            super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs);
+            if (mustParseContent()) {
+                super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs);
+            }
         }
 
         @Override
         public void visitJumpInsn(int opcode, Label label) {
-            super.visitJumpInsn(opcode, label);
+            if (mustParseContent()) {
+                super.visitJumpInsn(opcode, label);
+            }
         }
 
         @Override
@@ -407,7 +417,9 @@ public class ClassParser extends ClassVisitor {
 
         @Override
         public void visitIincInsn(int var, int increment) {
-            super.visitIincInsn(var, increment);
+            if (mustParseContent()) {
+                super.visitIincInsn(var, increment);
+            }
         }
 
         @Override
@@ -507,6 +519,17 @@ public class ClassParser extends ClassVisitor {
                 body.getElements().add(buildEmptyReturn(returnType));
             }
 
+            int arg = 0;
+            for (String argType : iterateArgs(desc)) {
+                if (arguments.size() <= arg) {
+                    J2xVariable argVar = new J2xVariable();
+                    argVar.setName("a" + arg);
+                    argVar.setType(parseClassPath(descToPath(argType)));
+                    arguments.add(argVar);
+                }
+                arg++;
+            }
+
             J2xMethod method = new J2xMethod(name,
                     returnType,
                     access(access),
@@ -535,7 +558,7 @@ public class ClassParser extends ClassVisitor {
         J2xReturn returnValue;
         if (J2xClass.VOID.equals(returnType)) {
             returnValue = new J2xReturn();
-        } else if (J2xClass.BOOL.equals(returnType)) {
+        } else if (J2xClass.BOOLEAN.equals(returnType)) {
             returnValue = new J2xReturn(new J2xLiteral(false));
         } else if (J2xClass.CHAR.equals(returnType)) {
             returnValue = new J2xReturn(new J2xLiteral(' '));
@@ -557,8 +580,12 @@ public class ClassParser extends ClassVisitor {
         return parsePolicy.mustParseContent(j2xClass.getFullName());
     }
 
+    private static Iterable<String> iterateArgs(String desc) {
+        return new DescIterable(argTypes(desc));
+    }
+
     private static int argCount(String desc) {
-        return Iterables.size(new DescIterable(argTypes(desc)));
+        return Iterables.size(iterateArgs(desc));
     }
 
     private static String argTypes(String desc) {
