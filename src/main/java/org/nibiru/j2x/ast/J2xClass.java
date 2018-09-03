@@ -99,12 +99,25 @@ public class J2xClass {
     }
 
     public J2xMethod findMethod(String name, String desc) {
+        String argOnlyDesc = argOnlyDesc(desc);
+
         for (J2xMethod method : methods) {
-            if (method.getName().equals(name)) {
+            if (method.getName().equals(name)
+                    && argOnlyDesc.equals(argOnlyDesc(method.getArgDesc()))) {
                 return method;
             }
         }
         return null;
+    }
+
+    private static String argOnlyDesc(String desc) {
+        return desc.substring(desc.indexOf('(') + 1, desc.indexOf(')'));
+    }
+
+    public boolean isAssignableFrom(J2xClass type) {
+        return this.equals(type)
+                || superClass != null
+                && superClass.isAssignableFrom(type);
     }
 
     @Override

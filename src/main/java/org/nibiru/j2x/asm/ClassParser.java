@@ -172,11 +172,16 @@ public class ClassParser extends ClassVisitor {
                                      String desc,
                                      String signature,
                                      String[] exceptions) {
-        return new MethodParser(access,
-                name,
-                desc,
-                signature,
-                exceptions);
+        if (!mustParseContent() && name.equals(j2xClass.getName())) {
+            // Ignorando constructores de clases no generadas... porque habria que poner la llamada a super
+            return null;
+        } else {
+            return new MethodParser(access,
+                    name,
+                    desc,
+                    signature,
+                    exceptions);
+        }
     }
 
     private static boolean isStatic(int access) {
@@ -539,7 +544,18 @@ public class ClassParser extends ClassVisitor {
                     desc,
                     arguments,
                     body);
-            j2xClass.getMethods().add(method);
+
+            // El retorno covariante genera 2 métodos con el mismo nombre y argumentos, pero con distinto tipo de retorno
+            // Busco si el método ya fue parseado, para tomar el que retorne la clase más específica
+            J2xMethod existingMethod = j2xClass.findMethod(name, desc);
+            if (existingMethod == null) {
+                j2xClass.getMethods().add(method);
+            } else {
+                if (!method.getType().isAssignableFrom(existingMethod.getType())) {
+                    j2xClass.getMethods().remove(existingMethod);
+                    j2xClass.getMethods().add(method);
+                }
+            }
         }
 
         private J2xVariable variable(int var) {
