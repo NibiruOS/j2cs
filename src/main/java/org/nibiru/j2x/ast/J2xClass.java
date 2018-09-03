@@ -102,8 +102,7 @@ public class J2xClass {
         String argOnlyDesc = argOnlyDesc(desc);
 
         for (J2xMethod method : methods) {
-            if (method.getName().equals(name)
-                    && argOnlyDesc.equals(argOnlyDesc(method.getArgDesc()))) {
+            if (method.getName().equals(name) && argOnlyDesc.equals(argOnlyDesc(method.getArgDesc()))) {
                 return method;
             }
         }

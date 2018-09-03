@@ -172,16 +172,11 @@ public class ClassParser extends ClassVisitor {
                                      String desc,
                                      String signature,
                                      String[] exceptions) {
-        if (!mustParseContent() && name.equals(j2xClass.getName())) {
-            // Ignorando constructores de clases no generadas... porque habria que poner la llamada a super
-            return null;
-        } else {
-            return new MethodParser(access,
-                    name,
-                    desc,
-                    signature,
-                    exceptions);
-        }
+        return new MethodParser(access,
+                name,
+                desc,
+                signature,
+                exceptions);
     }
 
     private static boolean isStatic(int access) {
