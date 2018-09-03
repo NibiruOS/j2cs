@@ -201,6 +201,7 @@ public class ClassParser extends ClassVisitor {
 
     private String descToPath(String signature) {
         if (signature.startsWith("[")) {
+            // TODO: esto capaz falla con mas de una dimension
             return descToPath(signature.substring(1)) + "[]";
         } else {
             switch (signature) {

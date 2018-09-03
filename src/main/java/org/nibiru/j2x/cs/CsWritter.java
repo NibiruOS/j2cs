@@ -2,6 +2,7 @@ package org.nibiru.j2x.cs;
 
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Joiner;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -36,6 +37,8 @@ public class CsWritter {
             ImmutableMap.of(Object.class.getName(), "object",
                     "string", "string",
                     "boolean", "bool");
+    private static final Map<String, String> KEYWORD_SUBSTITUTION =
+            ImmutableMap.of("unsafe", "_unsafe");
     private final Writer out;
     private final boolean pretty;
     private int indentation;
@@ -55,7 +58,7 @@ public class CsWritter {
             line("{");
             indentation++;
             line("%sclass %s%s", access(j2xClass.getAccess()),
-                    removeDollar(j2xClass.getName()),
+                    keyword(j2xClass.getName()),
                     (j2xClass.getSuperClass() == null)
                             ? ""
                             : (" : " + capitalize(j2xClass.getSuperClass().getFullName())));
@@ -83,7 +86,7 @@ public class CsWritter {
         line("%s%s %s;",
                 modifiers(field),
                 type(field.getType()),
-                removeDollar(field.getName()));
+                keyword(field.getName()));
     }
 
     private void write(J2xClass j2xClass, J2xMethod method) {
@@ -111,7 +114,7 @@ public class CsWritter {
         indentation++;
         for (J2xVariable variable : method.getBody().getVariables()) {
             if (!variable.isThis()) {
-                line(type(variable.getType()) + " " + removeDollar(variable.getName()) + ";");
+                line(type(variable.getType()) + " " + keyword(variable.getName()) + ";");
             }
         }
         for (Object element : method.getBody().getElements()) {
@@ -234,7 +237,7 @@ public class CsWritter {
     private static String variable(J2xVariable variable) {
         return String.format("%s %s",
                 type(variable.getType()),
-                removeDollar(variable.getName()));
+                keyword(variable.getName()));
     }
 
     private static String type(J2xClass type) {
@@ -249,14 +252,19 @@ public class CsWritter {
     }
 
     private static String access(J2xAccess access) {
-        return access == J2xAccess.PUBLIC
+        return access == J2xAccess.PUBLIC || access == J2xAccess.DEFAULT
                 ? "public "
                 : "";
     }
 
     private static String modifiers(J2xMethod method) {
-        return commonModifiers(method);
-        // + (method.isFinal() ? "sealed " : ""); // TODO: habria que ver todo el tema del virttual y todo eso. Por defecto es sealed, por lo que solo hay que especificalro si se está sobreescribiendo un método virtual.
+        return (!(method.isConstructor() && method.isStatic())
+                ? access(method.getAccess())
+                : "")
+                + (method.isStatic()
+                ? "static "
+                : "");
+        // + (method.isFinal() ? "sealed " : ""); // TODO: habria que ver todo el tema del virttual y todo eso. Por defecto es sealed, por lo que solo hay que especificarlo si se está sobreescribiendo un método virtual.
     }
 
     private static String modifiers(J2xField field) {
@@ -304,13 +312,14 @@ public class CsWritter {
     }
 
     private static String capitalize(String name) {
-        return removeDollar(Joiner.on('.')
+        return keyword(Joiner.on('.')
                 .join(Iterables.transform(Splitter.on('.')
                         .split(name), CaseFormat.LOWER_CAMEL.converterTo(CaseFormat.UPPER_CAMEL))));
     }
 
-    public static String removeDollar(String name) {
-        return name.replaceAll("\\$", "_");
+    public static String keyword(String name) {
+        return MoreObjects.firstNonNull(KEYWORD_SUBSTITUTION.get(name),
+                name).replaceAll("\\$", "_");
     }
 
     private static void updateStringClass(J2xClass j2xClass) {

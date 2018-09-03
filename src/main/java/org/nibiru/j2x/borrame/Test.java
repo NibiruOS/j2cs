@@ -23,7 +23,7 @@ public class Test {
                     .join(Iterables.transform(Splitter.on('.')
                             .split(clazz.getPackageName()), CaseFormat.LOWER_CAMEL.converterTo(CaseFormat.UPPER_CAMEL))));
             dir.mkdirs();
-            new CsWritter(new PrintWriter(new File(dir, CsWritter.removeDollar(clazz.getName()) + ".cs")), true).write(clazz);
+            new CsWritter(new PrintWriter(new File(dir, CsWritter.keyword(clazz.getName()) + ".cs")), true).write(clazz);
         }
     }
 }

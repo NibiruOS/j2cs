@@ -4,8 +4,8 @@ import org.nibiru.j2x.ast.J2xNative;
 
 public class Hola extends BaseClase {
     public Hola() {
-        super(456);
-        String toto = "123";
+        super(2345);
+        String toto = "ABC";
         toto.toUpperCase();
         // toto.toUpperCase();
 //        String caca ="pablo";
