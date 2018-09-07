@@ -365,6 +365,8 @@ public class ClassParser extends ClassVisitor {
         public void visitFieldInsn(int opcode, String owner, String name, String desc) {
             if (mustParseContent()) {
                 switch (opcode) {
+                    case Opcodes.GETSTATIC:
+                        break;
                     case Opcodes.INVOKESPECIAL:
                         break;
                 }

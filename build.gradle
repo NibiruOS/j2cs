@@ -38,6 +38,7 @@ publishing {
 dependencies {
 	testCompile "junit:junit:4.12"
     compile 'org.ow2.asm:asm:5.2'
+    compile 'fr.inria.gforge.spoon:spoon-core:7.0.0'
     compile 'com.google.guava:guava:21.0'
     compile "com.google.code.findbugs:jsr305:2.0.3"
 }

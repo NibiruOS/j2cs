@@ -2,16 +2,17 @@ package org.nibiru.j2x.borrame;
 
 import org.nibiru.j2x.ast.J2xNative;
 
-public class Hola extends BaseClase {
+public class Hola {
     public Hola() {
-        super(2345);
+        /*
         String toto = "ABC";
         toto.toUpperCase();
-        // toto.toUpperCase();
-//        String caca ="pablo";
-//        caca.toString();
+        String caca ="pablo";
+        System.out.println(caca.toString());
+        */
+        System.out.println("hola");
     }
-
+/*
     private static int numero(int a) {
         return 789;
     }
@@ -59,4 +60,5 @@ public class Hola extends BaseClase {
 //    static <T> T nativeCode(Class<T> clazz, String lang, String code) {
 //        return null;
 //    }
+*/
 }
