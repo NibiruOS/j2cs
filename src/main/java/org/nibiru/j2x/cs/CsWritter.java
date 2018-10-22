@@ -1,32 +1,16 @@
 package org.nibiru.j2x.cs;
 
-import com.google.common.base.CaseFormat;
-import com.google.common.base.Joiner;
-import com.google.common.base.MoreObjects;
-import com.google.common.base.Splitter;
-import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
+import com.google.common.base.*;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
-
-import org.nibiru.j2x.ast.J2xAccess;
-import org.nibiru.j2x.ast.J2xArray;
-import org.nibiru.j2x.ast.J2xBlock;
-import org.nibiru.j2x.ast.J2xClass;
-import org.nibiru.j2x.ast.J2xField;
-import org.nibiru.j2x.ast.J2xMember;
-import org.nibiru.j2x.ast.J2xMethod;
-import org.nibiru.j2x.ast.element.J2xAssignment;
-import org.nibiru.j2x.ast.element.J2xLiteral;
-import org.nibiru.j2x.ast.element.J2xMethodCall;
-import org.nibiru.j2x.ast.element.J2xNativeCode;
-import org.nibiru.j2x.ast.element.J2xReturn;
-import org.nibiru.j2x.ast.element.J2xVariable;
 import org.objectweb.asm.Type;
+import spoon.reflect.code.*;
+import spoon.reflect.declaration.*;
 
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -48,30 +32,35 @@ public class CsWritter {
         this.pretty = pretty;
     }
 
-    public void write(J2xClass j2xClass) {
+    public void write(CtClass<?> ctClass) {
         try {
-            if (j2xClass.getFullName().equals(String.class.getName())) {
-                updateStringClass(j2xClass);
+            if (ctClass.getQualifiedName().equals(String.class.getName())) {
+                updateStringClass(ctClass);
             }
 
-            line("namespace %s", capitalize(j2xClass.getPackageName()));
+            line("namespace %s", capitalize(ctClass.getPackage().getQualifiedName()));
             line("{");
             indentation++;
-            line("%sclass %s%s", access(j2xClass.getAccess()),
-                    keyword(j2xClass.getName()),
-                    (j2xClass.getSuperClass() == null)
+            line("%sclass %s%s", access(ctClass.getModifiers()),
+                    keyword(ctClass.getSimpleName()),
+                    (ctClass.getSuperclass() == null)
                             ? ""
-                            : (" : " + capitalize(j2xClass.getSuperClass().getFullName())));
+                            : (" : " + capitalize(ctClass.getSuperclass().getQualifiedName())));
             line("{");
             indentation++;
 
-            for (J2xField field : j2xClass.getFields()) {
-                write(field);
+            for (Object field : ctClass.getFields()) {
+                write((CtField<?>) field);
             }
 
-            for (J2xMethod method : j2xClass.getMethods()) {
-                write(j2xClass, method);
+            for (CtConstructor<?> constructor : ctClass.getConstructors()) {
+                write(ctClass, constructor);
             }
+
+            for (CtMethod<?> method : ctClass.getMethods()) {
+                write(ctClass, method);
+            }
+
             indentation--;
             line("}");
             indentation--;
@@ -82,46 +71,45 @@ public class CsWritter {
         }
     }
 
-    private void write(J2xField field) {
+    private void write(CtField<?> field) {
         line("%s%s %s;",
                 modifiers(field),
-                type(field.getType()),
-                keyword(field.getName()));
+                type(field.getType().getTypeDeclaration()),
+                keyword(field.getSimpleName()));
     }
 
-    private void write(J2xClass j2xClass, J2xMethod method) {
-        J2xMethodCall superCall = getSuperCall(method.getBody());
+    private void write(CtClass<?> ctClass, CtConstructor<?> constructor) {
+        line("%s%s(%s)    %s",
+                modifiers(constructor),
+                capitalize(ctClass.getSimpleName()),
+                Joiner.on(", ")
+                        .join(StreamSupport
+                                .stream(constructor.getParameters().spliterator(), false)
+                                .map(CsWritter::variable)
+                                .collect(Collectors.toList())),
+                " : base()");
+        write_Body(constructor);
 
-        if (j2xClass.getName().equals("Hola") && superCall != null) {
-            System.out.print(22);
-        }
+    }
 
-        line("%s%s%s(%s)    %s",
+    private void write(CtClass<?> ctClass, CtMethod<?> method) {
+        line("%s%s%s(%s)",
                 modifiers(method),
-                method.isConstructor()
-                        ? ""
-                        : type(method.getType()) + " ",
-                capitalize(method.isConstructor()
-                        ? j2xClass.getName()
-                        : method.getName()),
-                Joiner.on(", ").join(StreamSupport.stream(method.getArguments().spliterator(), false)
+                type(method.getType().getTypeDeclaration()) + " ",
+                capitalize(method.getSimpleName()),
+                Joiner.on(", ").join(StreamSupport.stream(method
+                        .getParameters()
+                        .spliterator(), false)
                         .map(CsWritter::variable)
-                        .collect(Collectors.toList())),
-                superCall != null
-                        ? " : base(" + buildArgs(superCall) + ")"
-                        : "");
+                        .collect(Collectors.toList())));
+        write_Body(method);
+    }
+
+    private void write_Body(CtExecutable<?> executable) {
         line("{");
         indentation++;
-        for (J2xVariable variable : method.getBody().getVariables()) {
-            if (!variable.isThis()) {
-                line(type(variable.getType()) + " " + keyword(variable.getName()) + ";");
-            }
-        }
-        for (Object element : method.getBody().getElements()) {
-            String line = element(element);
-            if (line != null) {
-                line(line);
-            }
+        for (CtStatement statement : executable.getBody().getStatements()) {
+            line(element(statement) + ";");
         }
 
         indentation--;
@@ -129,38 +117,39 @@ public class CsWritter {
         line("}");
     }
 
-    private static String element(Object element) {
-        if (element instanceof J2xMethodCall) {
-            return methodCallElement((J2xMethodCall) element);
-        } else if (element instanceof J2xLiteral) {
-            return literalElement((J2xLiteral) element);
-        } else if (element instanceof J2xVariable) {
-            return variableElement((J2xVariable) element);
-        } else if (element instanceof J2xAssignment) {
-            return assignmentElement((J2xAssignment) element);
-        } else if (element instanceof J2xReturn) {
-            return returnElement((J2xReturn) element);
-        } else if (element instanceof J2xNativeCode) {
-            return nativeCodeElement((J2xNativeCode) element);
+    private static String element(CtCodeElement element) {
+        if (element instanceof CtInvocation<?>) {
+            return methodCallElement((CtInvocation<?>) element);
+        } else if (element instanceof CtLiteral<?>) {
+            return literalElement((CtLiteral<?>) element);
+        } else if (element instanceof CtVariable<?>) {
+            return variableElement((CtVariable<?>) element);
+        } else if (element instanceof CtAssignment<?, ?>) {
+            return assignmentElement((CtAssignment<?, ?>) element);
+        } else if (element instanceof CtReturn<?>) {
+            return returnElement((CtReturn<?>) element);
+//        } else if (element instanceof ctNativeCode) {
+//            return nativeCodeElement((ctNativeCode) element);
         } else {
             throw new IllegalArgumentException();
         }
     }
 
-    private static String methodCallElement(J2xMethodCall element) {
-        if (!isSuperCall(element)) {
-            return (element.getTarget().getName()
-                    + "."
-                    + capitalize(element.getMethod().getName())
-                    + "("
-                    + buildArgs(element)
-                    + ");");
-        } else {
-            return null;
-        }
+    private static String methodCallElement(CtInvocation<?> element) {
+//        if (!isSuperCall(element)) {
+        return (element.getExecutable()
+                + "."
+//                + capitalize(element.getLabel())
+//                + "("
+//                + buildArgs(element)
+//                + ");"
+        );
+//        } else {
+//            return null;
+//        }
     }
 
-    private static String literalElement(J2xLiteral element) {
+    private static String literalElement(CtLiteral<?> element) {
         Object value = element.getValue();
         if (value == null) {
             return "null";
@@ -189,91 +178,98 @@ public class CsWritter {
         }
     }
 
-    private static String variableElement(J2xVariable element) {
-        return element.getName();
+    private static String variableElement(CtVariable<?> element) {
+        return element.getSimpleName();
     }
 
-    private static String assignmentElement(J2xAssignment element) {
-        return element(element.getTarget()) + " = " + element(element.getValue()) + ";";
+    private static String assignmentElement(CtAssignment<?, ?> element) {
+        return element(element.getAssigned())
+                + " = " + element(element.getAssignment());
     }
 
-    private static String returnElement(J2xReturn element) {
-        return "return" + (element.getValue() != null
-                ? " " + element(element.getValue())
-                : "")
-                + ";";
+    private static String returnElement(CtReturn<?> element) {
+        return "return" + (element.getReturnedExpression() != null
+                ? " " + element(element.getReturnedExpression())
+                : "");
     }
 
-    private static String nativeCodeElement(J2xNativeCode element) {
-        return element.getCode();
-    }
+//    private static String nativeCodeElement(ctNativeCode element) {
+//        return element.getCode();
+//    }
 
-    private static J2xMethodCall getSuperCall(J2xBlock block) {
-        if (block.getElements().isEmpty()) {
-            return null;
-        } else {
-            Object element = block.getElements().get(0);
-            return isSuperCall(element)
-                    ? (J2xMethodCall) element
-                    : null;
-        }
-    }
+//    private static ctMethodCall getSuperCall(ctBlock block) {
+//        if (block.getElements().isEmpty()) {
+//            return null;
+//        } else {
+//            Object element = block.getElements().get(0);
+//            return isSuperCall(element)
+//                    ? (ctMethodCall) element
+//                    : null;
+//        }
+//    }
 
-    private static boolean isSuperCall(Object element) {
-        if (element instanceof J2xMethodCall) {
-            J2xMethodCall callSentence = (J2xMethodCall) element;
-            return callSentence.getMethod().isConstructor();
-        } else {
-            return false;
-        }
-    }
+//    private static boolean isSuperCall(Object element) {
+//        if (element instanceof ctMethodCall) {
+//            ctMethodCall callSentence = (ctMethodCall) element;
+//            return callSentence.getMethod().isConstructor();
+//        } else {
+//            return false;
+//        }
+//    }
 
-    private static String buildArgs(J2xMethodCall callSentence) {
+    private static String buildArgs(CtInvocation<?> callSentence) {
         return Joiner.on(',')
-                .join(Iterables.transform(callSentence.getArgs(),
+                .join(Iterables.transform(callSentence.getArguments(),
                         CsWritter::element));
     }
 
-    private static String variable(J2xVariable variable) {
+    private static String variable(CtVariable<?> variable) {
         return String.format("%s %s",
-                type(variable.getType()),
-                keyword(variable.getName()));
+                type(variable.getType().getTypeDeclaration()),
+                keyword(variable.getSimpleName()));
     }
 
-    private static String type(J2xClass type) {
-        if (type instanceof J2xArray) {
-            J2xArray arrayType = (J2xArray) type;
-            return type(arrayType.getItemClass()) + Strings.repeat("[]", arrayType.getDimensions());
-        } else {
-            return PREDEFINED_TYPES.getOrDefault(type.getFullName(), type.isPrimitive()
-                    ? type.getName()
-                    : capitalize(type.getFullName()));
-        }
+    private static String type(CtType<?> type) {
+//        if (type instanceof ctArray) {
+//            ctArray arrayType = (ctArray) type;
+//            return type(arrayType.getItemClass()) + Strings.repeat("[]", arrayType.getDimensions());
+//        } else {
+        return PREDEFINED_TYPES.getOrDefault(type.getQualifiedName(), type.isPrimitive()
+                ? type.getSimpleName()
+                : capitalize(type.getQualifiedName()));
+//        }
     }
 
-    private static String access(J2xAccess access) {
-        return access == J2xAccess.PUBLIC || access == J2xAccess.DEFAULT
+    private static String access(Set<ModifierKind> access) {
+        return access.contains(ModifierKind.PUBLIC) || (!access.contains(ModifierKind.PRIVATE) && !access.contains(ModifierKind.PROTECTED))
                 ? "public "
                 : "";
     }
 
-    private static String modifiers(J2xMethod method) {
-        return (!(method.isConstructor() && method.isStatic())
-                ? access(method.getAccess())
+    private static String modifiers(CtConstructor<?> method) {
+        return (!method.isStatic()
+                ? access(method.getModifiers())
                 : "")
+                + (method.isStatic()
+                ? "static "
+                : "");
+    }
+
+    private static String modifiers(CtMethod<?> method) {
+        return access(method.getModifiers())
                 + (method.isStatic()
                 ? "static "
                 : "");
         // + (method.isFinal() ? "sealed " : ""); // TODO: habria que ver todo el tema del virttual y todo eso. Por defecto es sealed, por lo que solo hay que especificarlo si se está sobreescribiendo un método virtual.
     }
 
-    private static String modifiers(J2xField field) {
+    private static String modifiers(CtField<?> field) {
         return commonModifiers(field)
                 + (field.isFinal() ? "readonly " : "");
     }
 
-    private static String commonModifiers(J2xMember member) {
-        return access(member.getAccess())
+    private static String commonModifiers(CtTypeMember member) {
+        return access(member.getModifiers())
                 + (member.isStatic() ? "static " : "");
     }
 
@@ -322,19 +318,19 @@ public class CsWritter {
                 name).replaceAll("\\$", "_");
     }
 
-    private static void updateStringClass(J2xClass j2xClass) {
-        J2xBlock body = new J2xBlock();
-        body.getElements()
-                .add(new J2xReturn(new J2xLiteral(null)));
+    private static void updateStringClass(CtClass ctClass) {
+//        ctBlock body = new ctBlock();
+//        body.getElements()
+//                .add(new ctReturn(new ctLiteral(null)));
 
-        j2xClass.getMethods()
-                .add(new J2xMethod("FromNative",
-                        j2xClass,
-                        J2xAccess.PUBLIC,
-                        true,
-                        true,
-                        "()V",
-                        ImmutableList.of(new J2xVariable("value", new J2xClass("string", "", null, J2xAccess.PUBLIC))),
-                        body));
+//        ctClass.getMethods()
+//                .add(new ctMethod("FromNative",
+//                        ctClass,
+//                        ctAccess.PUBLIC,
+//                        true,
+//                        true,
+//                        "()V",
+//                        ImmutableList.of(new ctVariable("value", new ctClass("string", "", null, ctAccess.PUBLIC))),
+//                        body));
     }
 }

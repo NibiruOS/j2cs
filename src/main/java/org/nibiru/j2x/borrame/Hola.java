@@ -12,11 +12,12 @@ public class Hola {
         */
         System.out.println("hola");
     }
-/*
+
     private static int numero(int a) {
         return 789;
     }
 
+    /*
     @J2xNative(language = "C#",
             value = "System.Console.WriteLine(\"Primero meto el nativo! \" + a);")
     //  TODO: un mejor enfoque seria meter una funcion estática que embeba el código nativo...
