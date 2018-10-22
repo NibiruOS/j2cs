@@ -113,16 +113,18 @@ public class CsWritter {
 
     private void writeBody(CtExecutable<?> executable) {
         line("{");
-        indentation++;
-        for (CtStatement statement : executable.getBody().getStatements()) {
-            String sentence = element(statement);
-            if (sentence != null) {
-                line(sentence + ";");
+        if (executable.getBody() != null) {
+            indentation++;
+            for (CtStatement statement : executable.getBody()
+                    .getStatements()) {
+                String sentence = element(statement);
+                if (sentence != null) {
+                    line(sentence + ";");
+                }
             }
+
+            indentation--;
         }
-
-        indentation--;
-
         line("}");
     }
 
@@ -148,7 +150,8 @@ public class CsWritter {
         } else if (element instanceof CtTypeAccess<?>) {
             return typeAccessElement((CtTypeAccess<?>) element);
         } else {
-            throw new IllegalArgumentException();
+            return "";
+            //throw new IllegalArgumentException();
         }
     }
 
@@ -276,8 +279,8 @@ public class CsWritter {
 //        } else {
         return PREDEFINED_TYPES.getOrDefault(type.getQualifiedName(),
                 type.isPrimitive()
-                ? type.getSimpleName()
-                : capitalize(type.getQualifiedName()));
+                        ? type.getSimpleName()
+                        : capitalize(type.getQualifiedName()));
 //        }
     }
 
