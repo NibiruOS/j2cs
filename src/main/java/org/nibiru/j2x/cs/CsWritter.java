@@ -6,17 +6,20 @@ import com.google.common.collect.Iterables;
 import org.objectweb.asm.Type;
 import spoon.reflect.code.*;
 import spoon.reflect.declaration.*;
+import spoon.reflect.reference.CtTypeReference;
 
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class CsWritter {
+    public final static String CONSTRUCTOR_NAME = "<init>";
+    public final static String STATIC_CONSTRUCTOR_NAME = "<clinit>";
+
     private static final Map<String, String> PREDEFINED_TYPES =
             ImmutableMap.of(Object.class.getName(), "object",
                     "string", "string",
@@ -58,7 +61,7 @@ public class CsWritter {
             }
 
             for (CtMethod<?> method : ctClass.getMethods()) {
-                write(ctClass, method);
+                write(method);
             }
 
             indentation--;
@@ -74,42 +77,48 @@ public class CsWritter {
     private void write(CtField<?> field) {
         line("%s%s %s;",
                 modifiers(field),
-                type(field.getType().getTypeDeclaration()),
+                type(field.getType()),
                 keyword(field.getSimpleName()));
     }
 
     private void write(CtClass<?> ctClass, CtConstructor<?> constructor) {
-        line("%s%s(%s)    %s",
+        CtInvocation<?> superCall = getSuperCall(constructor.getBody());
+
+        line("%s%s(%s)%s",
                 modifiers(constructor),
                 capitalize(ctClass.getSimpleName()),
                 Joiner.on(", ")
-                        .join(StreamSupport
-                                .stream(constructor.getParameters().spliterator(), false)
+                        .join(constructor.getParameters().stream()
                                 .map(CsWritter::variable)
                                 .collect(Collectors.toList())),
-                " : base()");
-        write_Body(constructor);
+                superCall != null
+                        ? " : base(" + buildArgs(superCall) + ")"
+                        : "");
+        writeBody(constructor);
 
     }
 
-    private void write(CtClass<?> ctClass, CtMethod<?> method) {
+    private void write(CtMethod<?> method) {
         line("%s%s%s(%s)",
                 modifiers(method),
-                type(method.getType().getTypeDeclaration()) + " ",
+                type(method.getType()) + " ",
                 capitalize(method.getSimpleName()),
-                Joiner.on(", ").join(StreamSupport.stream(method
+                Joiner.on(", ").join(method
                         .getParameters()
-                        .spliterator(), false)
+                        .stream()
                         .map(CsWritter::variable)
                         .collect(Collectors.toList())));
-        write_Body(method);
+        writeBody(method);
     }
 
-    private void write_Body(CtExecutable<?> executable) {
+    private void writeBody(CtExecutable<?> executable) {
         line("{");
         indentation++;
         for (CtStatement statement : executable.getBody().getStatements()) {
-            line(element(statement) + ";");
+            String sentence = element(statement);
+            if (sentence != null) {
+                line(sentence + ";");
+            }
         }
 
         indentation--;
@@ -119,34 +128,63 @@ public class CsWritter {
 
     private static String element(CtCodeElement element) {
         if (element instanceof CtInvocation<?>) {
-            return methodCallElement((CtInvocation<?>) element);
+            return invocationElement((CtInvocation<?>) element);
         } else if (element instanceof CtLiteral<?>) {
             return literalElement((CtLiteral<?>) element);
+        } else if (element instanceof CtLocalVariable<?>) { // Local variable es subclase de variable
+            return localVariableElement((CtLocalVariable<?>) element);
         } else if (element instanceof CtVariable<?>) {
             return variableElement((CtVariable<?>) element);
         } else if (element instanceof CtAssignment<?, ?>) {
             return assignmentElement((CtAssignment<?, ?>) element);
         } else if (element instanceof CtReturn<?>) {
             return returnElement((CtReturn<?>) element);
-//        } else if (element instanceof ctNativeCode) {
-//            return nativeCodeElement((ctNativeCode) element);
+        } else if (element instanceof CtFieldRead<?>) { // Field read es un caso mas particular de variableread
+            return fieldReadElement((CtFieldRead<?>) element);
+        } else if (element instanceof CtVariableWrite<?>) {
+            return variableWriteElement((CtVariableWrite<?>) element);
+        } else if (element instanceof CtVariableRead<?>) {
+            return variableReadElement((CtVariableRead<?>) element);
+        } else if (element instanceof CtTypeAccess<?>) {
+            return typeAccessElement((CtTypeAccess<?>) element);
         } else {
             throw new IllegalArgumentException();
         }
     }
 
-    private static String methodCallElement(CtInvocation<?> element) {
-//        if (!isSuperCall(element)) {
-        return (element.getExecutable()
-                + "."
-//                + capitalize(element.getLabel())
-//                + "("
-//                + buildArgs(element)
-//                + ");"
-        );
-//        } else {
-//            return null;
-//        }
+    private static String variableReadElement(CtVariableRead<?> element) {
+        return element.getVariable().getSimpleName();
+    }
+
+    private static String typeAccessElement(CtTypeAccess<?> element) {
+        return type(element.getAccessedType());
+    }
+
+    private static String fieldReadElement(CtFieldRead<?> element) {
+        return target(element)
+                + element.getVariable().getSimpleName();
+    }
+
+    private static String variableWriteElement(CtVariableWrite<?> element) {
+        return element.getVariable().getSimpleName();
+    }
+
+    private static String invocationElement(CtInvocation<?> element) {
+        if (!isSuperCall(element)) {
+            return target(element)
+                    + capitalize(element.getExecutable().getSimpleName()
+                    + "("
+                    + buildArgs(element)
+                    + ")");
+        } else {
+            return null;
+        }
+    }
+
+    private static String target(CtTargetedExpression<?, ?> element) {
+        return element.getTarget() != null
+                ? element(element.getTarget()) + "."
+                : "";
     }
 
     private static String literalElement(CtLiteral<?> element) {
@@ -178,8 +216,17 @@ public class CsWritter {
         }
     }
 
+    private static String localVariableElement(CtLocalVariable<?> element) {
+        return type(element.getType())
+                + " "
+                + variableElement(element);
+    }
+
     private static String variableElement(CtVariable<?> element) {
-        return element.getSimpleName();
+        return element.getSimpleName() +
+                (element.getDefaultExpression() != null
+                        ? " = " + element(element.getDefaultExpression())
+                        : "");
     }
 
     private static String assignmentElement(CtAssignment<?, ?> element) {
@@ -193,29 +240,22 @@ public class CsWritter {
                 : "");
     }
 
-//    private static String nativeCodeElement(ctNativeCode element) {
-//        return element.getCode();
-//    }
+    private static CtInvocation<?> getSuperCall(CtBlock<?> block) {
+        if (block.getStatements().isEmpty()) {
+            return null;
+        } else {
+            Object element = block.getStatements().get(0);
+            return (element instanceof CtInvocation<?>) && isSuperCall((CtInvocation<?>) element)
+                    ? (CtInvocation<?>) element
+                    : null;
+        }
+    }
 
-//    private static ctMethodCall getSuperCall(ctBlock block) {
-//        if (block.getElements().isEmpty()) {
-//            return null;
-//        } else {
-//            Object element = block.getElements().get(0);
-//            return isSuperCall(element)
-//                    ? (ctMethodCall) element
-//                    : null;
-//        }
-//    }
-
-//    private static boolean isSuperCall(Object element) {
-//        if (element instanceof ctMethodCall) {
-//            ctMethodCall callSentence = (ctMethodCall) element;
-//            return callSentence.getMethod().isConstructor();
-//        } else {
-//            return false;
-//        }
-//    }
+    private static boolean isSuperCall(CtInvocation<?> element) {
+        return element.getExecutable().isStatic()
+                ? element.getExecutable().getSimpleName().equals(STATIC_CONSTRUCTOR_NAME)
+                : element.getExecutable().getSimpleName().equals(CONSTRUCTOR_NAME);
+    }
 
     private static String buildArgs(CtInvocation<?> callSentence) {
         return Joiner.on(',')
@@ -225,16 +265,17 @@ public class CsWritter {
 
     private static String variable(CtVariable<?> variable) {
         return String.format("%s %s",
-                type(variable.getType().getTypeDeclaration()),
+                type(variable.getType()),
                 keyword(variable.getSimpleName()));
     }
 
-    private static String type(CtType<?> type) {
+    private static String type(CtTypeReference<?> type) {
 //        if (type instanceof ctArray) {
 //            ctArray arrayType = (ctArray) type;
 //            return type(arrayType.getItemClass()) + Strings.repeat("[]", arrayType.getDimensions());
 //        } else {
-        return PREDEFINED_TYPES.getOrDefault(type.getQualifiedName(), type.isPrimitive()
+        return PREDEFINED_TYPES.getOrDefault(type.getQualifiedName(),
+                type.isPrimitive()
                 ? type.getSimpleName()
                 : capitalize(type.getQualifiedName()));
 //        }

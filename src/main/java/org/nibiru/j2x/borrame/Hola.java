@@ -4,18 +4,18 @@ import org.nibiru.j2x.ast.J2xNative;
 
 public class Hola {
     public Hola() {
-        /*
-        String toto = "ABC";
-        toto.toUpperCase();
-        String caca ="pablo";
-        System.out.println(caca.toString());
-        */
         System.out.println("hola");
     }
 
     private static int numero(int a) {
+        String toto = "ABC";
+        toto.toUpperCase();
+        String caca ="pablo";
+        System.out.println(caca.toString());
         return 789;
     }
+        /*
+        */
 
     /*
     @J2xNative(language = "C#",
