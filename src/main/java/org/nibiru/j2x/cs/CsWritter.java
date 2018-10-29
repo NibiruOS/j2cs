@@ -3,6 +3,7 @@ package org.nibiru.j2x.cs;
 import com.google.common.base.*;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import org.objectweb.asm.Type;
 import spoon.reflect.code.*;
 import spoon.reflect.declaration.*;
@@ -10,8 +11,12 @@ import spoon.reflect.reference.CtTypeReference;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -26,6 +31,48 @@ public class CsWritter {
                     "boolean", "bool");
     private static final Map<String, String> KEYWORD_SUBSTITUTION =
             ImmutableMap.of("unsafe", "_unsafe");
+
+    private static final SortedMap<Class<?>, Function<Object, String>>
+            ELEMENT_FUNCTIONS = Maps.newTreeMap((c1, c2) -> c1.isAssignableFrom(c2)
+            ? (c2.isAssignableFrom(c1)
+            ? 0
+            : -1)
+            : 1);
+
+    private static <T> void elementFunction(Class<T> clazz, Function<T, String> function) {
+        ELEMENT_FUNCTIONS.put(clazz, (Function<Object, String>) function);
+    }
+
+    static {
+        for (Method method : CsWritter.class.getDeclaredMethods()) {
+            if (Modifier.isStatic(method.getModifiers())
+                    && method.getName().endsWith("Element")
+                    && String.class.isAssignableFrom(method.getReturnType())
+                    && method.getParameterCount() == 1) {
+                elementFunction(method.getParameterTypes()[0], (element) -> {
+                    try {
+                        method.setAccessible(true);
+                        return (String) method.invoke(null, element);
+                    } catch (IllegalAccessException | InvocationTargetException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+            }
+        }
+        /*
+        elementFunction(CtInvocation.class, CsWritter::invocationElement);
+        elementFunction(CtLiteral.class, CsWritter::literalElement);
+        elementFunction(CtLocalVariable.class, CsWritter::localVariableElement);
+        elementFunction(CtVariable.class, CsWritter::variableElement);
+        elementFunction(CtAssignment.class, CsWritter::assignmentElement);
+        elementFunction(CtReturn.class, CsWritter::returnElement);
+        elementFunction(CtFieldRead.class, CsWritter::fieldReadElement);
+        elementFunction(CtVariableWrite.class, CsWritter::variableWriteElement);
+        elementFunction(CtVariableRead.class, CsWritter::variableReadElement);
+        elementFunction(CtTypeAccess.class, CsWritter::typeAccessElement);
+        */
+    }
+
     private final Writer out;
     private final boolean pretty;
     private int indentation;
@@ -129,31 +176,15 @@ public class CsWritter {
     }
 
     private static String element(CtCodeElement element) {
-        if (element instanceof CtInvocation<?>) {
-            return invocationElement((CtInvocation<?>) element);
-        } else if (element instanceof CtLiteral<?>) {
-            return literalElement((CtLiteral<?>) element);
-        } else if (element instanceof CtLocalVariable<?>) { // Local variable es subclase de variable
-            return localVariableElement((CtLocalVariable<?>) element);
-        } else if (element instanceof CtVariable<?>) {
-            return variableElement((CtVariable<?>) element);
-        } else if (element instanceof CtAssignment<?, ?>) {
-            return assignmentElement((CtAssignment<?, ?>) element);
-        } else if (element instanceof CtReturn<?>) {
-            return returnElement((CtReturn<?>) element);
-        } else if (element instanceof CtFieldRead<?>) { // Field read es un caso mas particular de variableread
-            return fieldReadElement((CtFieldRead<?>) element);
-        } else if (element instanceof CtVariableWrite<?>) {
-            return variableWriteElement((CtVariableWrite<?>) element);
-        } else if (element instanceof CtVariableRead<?>) {
-            return variableReadElement((CtVariableRead<?>) element);
-        } else if (element instanceof CtTypeAccess<?>) {
-            return typeAccessElement((CtTypeAccess<?>) element);
-        } else {
-            return "";
-            //throw new IllegalArgumentException();
+        for (Map.Entry<Class<?>, Function<Object, String>> entry : ELEMENT_FUNCTIONS.entrySet()) {
+            if (entry.getKey().isAssignableFrom(element.getClass())) {
+                return entry.getValue().apply(element);
+            }
         }
+        return "";
+        //throw new IllegalArgumentException();
     }
+
 
     private static String variableReadElement(CtVariableRead<?> element) {
         return element.getVariable().getSimpleName();
